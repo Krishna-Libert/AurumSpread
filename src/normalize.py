@@ -114,12 +114,12 @@ CONTRACT_SPECS: Dict[str, Dict[str, Any]] = {
         "commodity": "SILVER",
         "name": "Silver 100 Grams",
         "lot_size_grams": 100,
-        "quote_unit_grams": 100,
+        "quote_unit_grams": 10,
         "purity": 999,
         "purity_factor": 1.0,
         "expiry_cycle": "Last business day",
         "tender_period_days": 5,
-        "formula_str": "Close ÷ 100",
+        "formula_str": "Close ÷ 10",
     },
 }
 
@@ -162,7 +162,7 @@ def normalize_gold_prices(df: pd.DataFrame) -> pd.DataFrame:
         "SILVER": lambda price: price / 1000.0,
         "SILVERM": lambda price: price / 1000.0,
         "SILVERMIC": lambda price: price / 1000.0,
-        "SILVER100": lambda price: price / 100.0,
+        "SILVER100": lambda price: price / 10.0,
     }
 
     result["normalized_price_per_gram"] = pd.NA

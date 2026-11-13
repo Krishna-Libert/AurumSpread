@@ -7,6 +7,9 @@ Ingests all 82 raw MCX Bhavcopy CSV files and builds:
 """
 
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import pandas as pd
 from src.normalize import normalize_commodity_prices
 

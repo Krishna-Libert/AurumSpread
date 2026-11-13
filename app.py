@@ -80,8 +80,8 @@ render_html("""
 }
 
 .block-container {
-    padding-top: 1.2rem;
-    padding-bottom: 3rem;
+    padding-top: 1.0rem;
+    padding-bottom: 2.5rem;
     max-width: 1440px;
 }
 
@@ -102,51 +102,51 @@ section[data-testid="stSidebar"] {
 .glass-card {
     background: linear-gradient(135deg, rgba(14, 22, 38, 0.95) 0%, rgba(10, 16, 29, 0.95) 100%);
     border: 1px solid #1F2E47;
-    border-radius: 12px;
-    padding: 18px;
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
-    margin-bottom: 16px;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.35);
+    margin-bottom: 12px;
 }
 .glass-card-gold {
     background: linear-gradient(135deg, rgba(245, 197, 66, 0.05) 0%, rgba(14, 22, 38, 0.95) 100%);
     border: 1px solid rgba(245, 197, 66, 0.25);
-    border-radius: 12px;
-    padding: 18px;
-    margin-bottom: 16px;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
 }
 
 /* Metric cards override */
 div[data-testid="stMetric"] {
     background: linear-gradient(135deg, #0E1626 0%, #0B1220 100%);
     border: 1px solid #1F2E47;
-    padding: 16px 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    padding: 12px 16px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     transition: transform 0.15s ease, border-color 0.15s ease;
 }
 div[data-testid="stMetric"]:hover {
-    border-color: rgba(245, 197, 66, 0.25);
-    transform: translateY(-2px);
+    border-color: rgba(245, 197, 66, 0.3);
+    transform: translateY(-1px);
 }
 div[data-testid="stMetricLabel"] {
     color: #94A3B8 !important;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
 }
 div[data-testid="stMetricValue"] {
     color: #F8FAFC !important;
-    font-size: 1.6rem !important;
+    font-size: 1.45rem !important;
     font-weight: 700 !important;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* Navigation Tabs */
 button[data-baseweb="tab"] {
-    font-size: 0.95rem !important;
+    font-size: 0.92rem !important;
     font-weight: 600 !important;
-    padding: 12px 20px !important;
+    padding: 10px 18px !important;
     border-radius: 8px 8px 0 0 !important;
     color: #94A3B8 !important;
     transition: all 0.2s ease;
@@ -162,9 +162,9 @@ button[data-baseweb="tab"][aria-selected="true"] {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 9px;
-    border-radius: 6px;
-    font-size: 0.78rem;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-size: 0.75rem;
     font-weight: 600;
 }
 .badge-green { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.35); }
@@ -177,17 +177,44 @@ button[data-baseweb="tab"][aria-selected="true"] {
 .stButton button {
     background: linear-gradient(135deg, #F5C542 0%, #D4A017 100%);
     color: #070B14;
-    border-radius: 8px;
+    border-radius: 6px;
     border: none;
     font-weight: 700;
-    padding: 8px 18px;
+    padding: 6px 14px;
+    font-size: 0.85rem;
     transition: all 0.2s ease-in-out;
 }
 .stButton button:hover {
     filter: brightness(1.1);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(245, 197, 66, 0.3);
+    box-shadow: 0 4px 10px rgba(245, 197, 66, 0.25);
 }
+
+/* Horizontal Ticker Bar */
+.ticker-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    background: #0B1220;
+    border: 1px solid #1E293B;
+    border-radius: 8px;
+    padding: 6px 12px;
+    margin-bottom: 12px;
+    align-items: center;
+}
+.ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #0E1626;
+    border: 1px solid #1F2E47;
+    border-radius: 6px;
+    padding: 3px 10px;
+    font-size: 0.8rem;
+}
+.ticker-name { font-weight: 700; color: #F8FAFC; }
+.ticker-price { font-weight: 700; color: #F5C542; font-family: monospace; }
+.ticker-close { color: #64748B; font-size: 0.72rem; }
 </style>
 """)
 
@@ -195,15 +222,17 @@ button[data-baseweb="tab"][aria-selected="true"] {
 # Sidebar Controls & Commodity Universe Switcher
 # ---------------------------------------------------------
 with st.sidebar:
-    st.markdown("### 🌐 Market Universe & Date")
+    st.markdown("### 🌐 Market Universe")
     
-    # Dynamic Commodity Switcher
+    # Dynamic Commodity Switcher with safe fallback
     commodity_choice = st.segmented_control(
         "Commodity Universe",
         options=["🟡 Gold Futures", "⚪ Silver Futures"],
         default="🟡 Gold Futures",
         help="Switch dynamically between MCX Gold contracts and MCX Silver contracts.",
     )
+    if not commodity_choice:
+        commodity_choice = "🟡 Gold Futures"
 
     is_gold = "Gold" in commodity_choice
     active_data_path = GOLD_DATA_PATH if is_gold else SILVER_DATA_PATH
@@ -228,7 +257,7 @@ with st.sidebar:
 
     # Dynamic Date Scrubber
     selected_date = st.selectbox(
-        "Market Observation Date",
+        "Observation Date (82 Sessions)",
         options=all_dates[::-1],
         index=0,
         format_func=lambda d: pd.to_datetime(d).strftime("%d %b %Y"),
@@ -237,77 +266,74 @@ with st.sidebar:
 
     latest_date = pd.to_datetime(selected_date)
     latest_data = df[df["trade_date"] == latest_date]
-    avg_norm_price = float(latest_data["normalized_price_per_gram"].mean()) if not latest_data.empty else 7500.0
+    avg_norm_price = float(latest_data["normalized_price_per_gram"].mean()) if not latest_data.empty else (7500.0 if is_gold else 230.0)
+
+    # 1-Click Strategy Presets
+    with st.expander("🎛️ Strategy Presets & Z-Scores", expanded=False):
+        preset_choice = st.segmented_control(
+            "1-Click Quant Presets",
+            options=["Institutional", "Balanced", "Aggressive", "Custom"],
+            default="Balanced",
+            help="Quickly populate backtest thresholds based on institutional risk tolerance.",
+        )
+        
+        if preset_choice == "Institutional":
+            default_entry_z = 2.5
+            default_exit_z = 0.2
+            default_tender_days = 7
+            default_cost = 6.0
+            default_slippage = 3.0
+        elif preset_choice == "Aggressive":
+            default_entry_z = 1.5
+            default_exit_z = 0.0
+            default_tender_days = 3
+            default_cost = 4.0
+            default_slippage = 1.5
+        elif preset_choice == "Balanced":
+            default_entry_z = 2.0
+            default_exit_z = 0.0
+            default_tender_days = 5
+            default_cost = 5.0
+            default_slippage = 2.0
+        else:  # Custom
+            default_entry_z = 2.0
+            default_exit_z = 0.0
+            default_tender_days = 5
+            default_cost = 5.0
+            default_slippage = 2.0
+
+        sb_entry_z = st.slider(
+            "Entry Threshold (σ)",
+            min_value=1.0, max_value=3.5, value=default_entry_z, step=0.1,
+            help="Z-Score trigger beyond historical expanding mean to enter spread."
+        )
+        sb_exit_z = st.slider(
+            "Exit Threshold (σ)",
+            min_value=0.0, max_value=1.5, value=default_exit_z, step=0.1,
+            help="Z-Score reversion level to close position."
+        )
+
+    # Execution Costs
+    with st.expander("💸 Friction & Slippage Model", expanded=False):
+        sb_cost_per_leg = st.number_input(
+            "Fee + Tax (₹/leg)",
+            min_value=0.0, max_value=50.0, value=default_cost, step=0.5,
+            help="Turnover charges (0.0021%) + CTT (0.0125%) + GST + Brokerage."
+        )
+        sb_slippage_per_leg = st.number_input(
+            "Slippage (₹/g/leg)",
+            min_value=0.0, max_value=25.0, value=default_slippage, step=0.5,
+            help="Bid-ask crossing spread penalty."
+        )
+        sb_tender_exit_days = st.slider(
+            "Tender Lockout (Days)",
+            min_value=1, max_value=10, value=default_tender_days,
+            help="Mandatory pre-expiry exit to prevent physical delivery obligation."
+        )
+        sb_lots = st.number_input("Lots Traded", min_value=1, max_value=50, value=1)
 
     st.markdown("---")
-    st.markdown("### 🎛️ Strategy Presets & Controls")
-    
-    preset_choice = st.segmented_control(
-        "1-Click Quant Presets",
-        options=["Institutional", "Balanced", "Aggressive", "Custom"],
-        default="Balanced",
-        help="Quickly populate backtest thresholds based on institutional risk tolerance.",
-    )
-    
-    if preset_choice == "Institutional":
-        default_entry_z = 2.5
-        default_exit_z = 0.2
-        default_tender_days = 7
-        default_cost = 6.0
-        default_slippage = 3.0
-    elif preset_choice == "Aggressive":
-        default_entry_z = 1.5
-        default_exit_z = 0.0
-        default_tender_days = 3
-        default_cost = 4.0
-        default_slippage = 1.5
-    elif preset_choice == "Balanced":
-        default_entry_z = 2.0
-        default_exit_z = 0.0
-        default_tender_days = 5
-        default_cost = 5.0
-        default_slippage = 2.0
-    else:  # Custom
-        default_entry_z = 2.0
-        default_exit_z = 0.0
-        default_tender_days = 5
-        default_cost = 5.0
-        default_slippage = 2.0
-
-    sb_entry_z = st.slider(
-        "Entry Threshold (σ)",
-        min_value=1.0, max_value=3.5, value=default_entry_z, step=0.1,
-        help="Z-Score trigger beyond historical expanding mean to enter spread."
-    )
-    sb_exit_z = st.slider(
-        "Exit Threshold (σ)",
-        min_value=0.0, max_value=1.5, value=default_exit_z, step=0.1,
-        help="Z-Score reversion level to close position."
-    )
-    
-    st.markdown("---")
-    st.markdown("#### 💸 Friction & Execution Cost Model")
-    
-    sb_cost_per_leg = st.number_input(
-        "Exchange Fee + Tax + Brokerage (₹/leg)",
-        min_value=0.0, max_value=50.0, value=default_cost, step=0.5,
-        help="Turnover charges (0.0021%) + CTT (0.0125%) + GST + Brokerage."
-    )
-    sb_slippage_per_leg = st.number_input(
-        "Base Execution Slippage (₹/g/leg)",
-        min_value=0.0, max_value=25.0, value=default_slippage, step=0.5,
-        help="Bid-ask crossing spread penalty."
-    )
-    sb_tender_exit_days = st.slider(
-        "MCX Tender Lockout (Days)",
-        min_value=1, max_value=10, value=default_tender_days,
-        help="Mandatory pre-expiry exit to prevent physical delivery obligation."
-    )
-    sb_lots = st.number_input("Lots Traded", min_value=1, max_value=50, value=1)
-
-    st.markdown("---")
-    st.markdown("**Data Integrity Guarantee**")
-    st.caption("• 82 Daily MCX Bhavcopies (Jul–Oct 2026)\n• 4,000+ Verified Futures Rows\n• Expanding window calculations (Zero lookahead)")
+    st.caption("🛡️ **Data Integrity Guarantee**\n• 82 Daily MCX Bhavcopies\n• 4,009 Unified Futures Records\n• Zero Lookahead Bias")
 
 # Shared Plotly Dark Theme
 PLOTLY_THEME = dict(
@@ -387,7 +413,7 @@ def dialog_order_ticket():
         far_price=(avg_norm_price + 35) * 10,
     )
 
-    st.markdown(f"""
+    render_html(f"""
     <div class='glass-card'>
         <div style='display: flex; justify-content: space-between;'>
             <div><b>Strategy:</b> {ticket['strategy']} ({ticket['symbol']})</div>
@@ -398,7 +424,7 @@ def dialog_order_ticket():
         • <b>Leg 2</b>: <code>{ticket['legs'][1]['transaction_type']} {ticket['legs'][1]['lots']} lot(s) {ticket['legs'][1]['trading_symbol']} @ LIMIT ₹{ticket['legs'][1]['price']:,.1f}</code><br>
         • <b>Estimated Margin</b>: <b>₹{ticket['estimated_spread_margin_inr']:,.0f}</b> (Unhedged: ₹{ticket['estimated_unhedged_margin_inr']:,.0f})
     </div>
-    """, unsafe_allow_html=True)
+    """)
 
     json_str = json.dumps(ticket["zerodha_kite_json"], indent=2)
     csv_str = export_order_ticket_csv(ticket)
@@ -409,128 +435,83 @@ def dialog_order_ticket():
 
 
 # ---------------------------------------------------------
-# Top Header Bar
+# Top Header Bar: Clean FinTech Navbar
 # ---------------------------------------------------------
 col_head1, col_head2 = st.columns([3, 2])
 
 with col_head1:
-    st.title(f"🟡 AurumSpread PRO")
-    st.caption(f"Institutional Commodity Relative-Value, Carry & AI Intelligence | Monitoring {commodity_choice}")
+    render_html(f"""
+    <div style='display: flex; align-items: baseline; gap: 10px;'>
+        <h2 style='margin: 0; font-size: 1.8rem; color: #F8FAFC;'>🟡 AurumSpread <span style='font-size: 0.95rem; color: #F5C542; background: rgba(245, 197, 66, 0.12); border: 1px solid rgba(245, 197, 66, 0.35); padding: 2px 8px; border-radius: 6px;'>PRO QUANT</span></h2>
+        <span style='color: #94A3B8; font-size: 0.85rem;'>Track 03 • Commodity Derivatives Intelligence</span>
+    </div>
+    <div style='color: #64748B; font-size: 0.82rem; margin-top: 2px;'>
+        Active Universe: <b style='color: #F1F5F9;'>{commodity_choice}</b> &nbsp;|&nbsp; Session: <b style='color: #F5C542;'>{latest_date.strftime('%d %b %Y')}</b>
+    </div>
+    """)
 
 with col_head2:
-    st.markdown("**Hack in Hills '26** | Track 03: Commodity Derivatives Intelligence")
-    st.caption("Team AurumSpread: Shivansh Sahni • Krishna Sharma • Dhruv Gupta")
-    
     btn_c1, btn_c2, btn_c3 = st.columns(3)
-    if btn_c1.button("🩺 Data Doctor", use_container_width=True):
+    if btn_c1.button("🩺 Doctor", use_container_width=True, help="Run Bhavcopy Integrity Audit"):
         dialog_data_doctor()
-    if btn_c2.button("📐 Lot Sizer", use_container_width=True):
+    if btn_c2.button("📐 Sizer", use_container_width=True, help="Delta Hedge Lot Sizer"):
         dialog_hedge_calculator()
-    if btn_c3.button("📋 Order Ticket", use_container_width=True):
+    if btn_c3.button("📋 Ticket", use_container_width=True, help="2-Leg Broker Order Generator"):
         dialog_order_ticket()
 
 # ---------------------------------------------------------
-# Live Ticker Ribbon
+# Sleek Horizontal Market Ticker Ribbon (Ultra-Slim)
 # ---------------------------------------------------------
-st.markdown(f"##### 📌 {commodity_choice} Snapshot ({latest_date.strftime('%d %b %Y')})")
 active_symbols = sorted(df["symbol"].unique())
-ticker_cols = st.columns(len(active_symbols))
+ticker_html_items = []
 
-for sym, col in zip(active_symbols, ticker_cols):
+for sym in active_symbols:
     sub_df = latest_data[latest_data["symbol"] == sym]
     if not sub_df.empty:
         near_contract = sub_df.sort_values("expiry_date").iloc[0]
         norm_p = near_contract["normalized_price_per_gram"]
         raw_p = near_contract["close"]
         spec = CONTRACT_SPECS.get(sym, {})
-        col.metric(
-            label=f"{sym} ({spec.get('lot_size_grams', 10)}g • {spec.get('purity', 999)} Purity)",
-            value=f"₹{norm_p:,.2f}/g",
-            delta=f"Close: ₹{raw_p:,.0f}",
-            delta_color="off",
-        )
+        lot_g = spec.get("lot_size_grams", 10)
+        lot_str = f"{lot_g // 1000}kg" if lot_g >= 1000 else f"{lot_g}g"
+        
+        if is_gold:
+            val_str = f"₹{norm_p:,.1f}/g"
+        else:
+            val_str = f"₹{norm_p*1000:,.0f}/kg (₹{norm_p:,.1f}/g)"
 
-# ---------------------------------------------------------
-# Onboarding Guided Workflow Card
-# ---------------------------------------------------------
-with st.expander("🗺️ How AurumSpread Solves Commodity Spread Intelligence (30-Second Guided Tour)", expanded=False):
-    step_c1, step_c2, step_c3 = st.columns(3)
-    with step_c1:
-        st.markdown("**STEP 1: Unit & Purity Normalization**")
-        st.caption("Converts disjoint MCX contracts (100g, 10g, 8g, 1g, 1kg) and purity (995 vs 999) into a uniform, apples-to-apples ₹/1g of 999 gold benchmark.")
-    with step_c2:
-        st.markdown("**STEP 2: Carry & Forward Curve**")
-        st.caption("Constructs the forward term structure and separates predictable carrying cost decay (roll-down) from true statistical mispricing.")
-    with step_c3:
-        st.markdown("**STEP 3: Honest Survival Proof**")
-        st.caption("Enforces the MCX 5-day physical tender lockout and volume haircuts to prove whether an apparent arbitrage edge survives real fees and slippage.")
+        ticker_html_items.append(f"""
+        <div class='ticker-item'>
+            <span class='ticker-name'>{sym}</span>
+            <span style='color: #64748B; font-size: 0.72rem;'>({lot_str})</span>
+            <span class='ticker-price'>{val_str}</span>
+            <span class='ticker-close'>Close: ₹{raw_p:,.0f}</span>
+        </div>
+        """)
+
+render_html(f"""
+<div class='ticker-bar'>
+    <span style='font-size: 0.75rem; font-weight: 700; color: #94A3B8; text-transform: uppercase;'>MARKET SNAPSHOT:</span>
+    {''.join(ticker_html_items)}
+</div>
+""")
 
 # ---------------------------------------------------------
 # The 5 Main Trader Dashboard Tabs (Including AI Copilot!)
 # ---------------------------------------------------------
 tabs = st.tabs([
     "Tab 1: 🟡 Fair Price & Quiet Alert",
-    "Tab 2: 📅 Expiry Calendar & Liquidity",
+    "Tab 2: 📅 Expiry Calendar & Depth",
     "Tab 3: 🌐 Carry & COMEX Parity",
     "Tab 4: ⚖️ Simulator & Order Ticket",
     "Tab 5: 🤖 Aurum Copilot (AI Quant)",
 ])
 
 # =========================================================
-# TAB 1: FAIR PRICE & QUIET ALERT
+# TAB 1: FAIR PRICE & QUIET ALERT (DECLUTTERED)
 # =========================================================
 with tabs[0]:
-    st.subheader("Fair Price Normalization & Quiet Alert Scanner")
-    st.caption("Converts disparate contracts to ₹/1g 999 gold and silences noise, fee traps, and delivery risks.")
-
-    # Top KPI Metrics
-    tk1, tk2, tk3, tk4 = st.columns(4)
-    tk1.metric("Selected Market Date", latest_date.strftime("%d %b %Y"))
-    tk2.metric("Benchmark Price (999)", f"₹{avg_norm_price:,.2f}/g", "Normalized Benchmark")
-    tk3.metric("Tradable Expiries", len(latest_data), f"Across {df['symbol'].nunique()} Instruments")
-    tk4.metric("Active Capital Defense", "Quiet Alerts Enabled", delta="Noise Suppressed")
-
-    st.markdown("---")
-
-    # 1. Normalized Price Movement Chart & Dispersion
-    c_p1, c_p2 = st.columns([3, 2])
-
-    with c_p1:
-        st.markdown("##### 📈 Historical Fair Price Movement (₹/1g 999 Benchmark)")
-        chart_df = df.copy()
-        fig_hist = px.line(
-            chart_df,
-            x="trade_date",
-            y="normalized_price_per_gram",
-            color="symbol",
-            title="Normalized Commodity Prices Over Time",
-            labels={"trade_date": "Trading Date", "normalized_price_per_gram": "Price (₹/1g 999)", "symbol": "Contract"},
-            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
-        )
-        fig_hist.update_layout(**PLOTLY_THEME, height=350, margin=dict(l=40, r=20, t=40, b=40))
-        st.plotly_chart(fig_hist, use_container_width=True)
-
-    with c_p2:
-        st.markdown("##### 📊 Latest Contract Dispersion (₹/g)")
-        fig_box = px.box(
-            latest_data,
-            x="symbol",
-            y="normalized_price_per_gram",
-            color="symbol",
-            points="all",
-            title=f"Dispersion on {latest_date.strftime('%d %b %Y')}",
-            labels={"normalized_price_per_gram": "₹/g (999)", "symbol": "Contract"},
-            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
-        )
-        fig_box.update_layout(**PLOTLY_THEME, showlegend=False, height=350, margin=dict(l=40, r=20, t=40, b=40))
-        st.plotly_chart(fig_box, use_container_width=True)
-
-    st.markdown("---")
-
-    # 2. Quiet Alert Scanner Section
-    st.markdown("### 🔔 Quiet Alert Scanner: Multi-Stage Noise Suppression")
-    st.caption("Scans active calendar spread pairs on the selected date. Signals are suppressed if they violate tender windows, liquidity depth, or post-cost edge.")
-
+    # Quiet Alert Scan Result
     alert_res = scan_quiet_alerts(
         df,
         entry_zscore=sb_entry_z,
@@ -539,32 +520,117 @@ with tabs[0]:
         tender_days=sb_tender_exit_days,
     )
 
-    qk1, qk2, qk3, qk4, qk5 = st.columns(5)
-    qk1.metric("Pairs Scanned", alert_res["total_pairs_evaluated"])
-    qk2.metric("Raw Statistical Deviations", alert_res["raw_signals_count"], help=f"|Z| >= {sb_entry_z}")
-    qk3.metric("Tender Suppressed", alert_res["tender_suppressed_count"], help="Blocked: In 5-day MCX physical delivery window")
-    qk4.metric("Fee / Cost Traps", alert_res["cost_suppressed_count"], help="Blocked: Gross edge < Roundtrip transaction friction")
-    qk5.metric("Active Quiet Alerts", alert_res["active_alerts_count"], delta="Executable Alpha" if alert_res["active_alerts_count"] > 0 else "0 False Alarms")
+    # 1. Executive Metric Strip (4 High-Impact KPIs)
+    k1, k2, k3, k4 = st.columns(4)
+    
+    if is_gold:
+        k1.metric("Benchmark Price (999)", f"₹{avg_norm_price:,.2f} / g", f"{df['symbol'].nunique()} Contracts Active")
+    else:
+        k1.metric("Benchmark Price (999)", f"₹{avg_norm_price*1000:,.0f} / kg", f"₹{avg_norm_price:.2f}/g ({df['symbol'].nunique()} Contracts)")
 
-    view_filter = st.pills(
-        "Filter Pairs By Status",
-        options=["All Scanned Pairs", "Triggered & Suppressed Only", "Tender Lockout", "Fair Value"],
-        default="All Scanned Pairs",
-    )
+    k2.metric("Pairs Evaluated", alert_res["total_pairs_evaluated"], f"Session {latest_date.strftime('%d %b %Y')}")
+    
+    suppressed_total = alert_res["tender_suppressed_count"] + alert_res["cost_suppressed_count"]
+    k3.metric("Noise Traps Blocked", suppressed_total, f"{alert_res['tender_suppressed_count']} Tender • {alert_res['cost_suppressed_count']} Fees")
+    
+    active_alerts = alert_res["active_alerts_count"]
+    k4.metric("Executable Quiet Alerts", active_alerts, delta="Alpha Survives Fees" if active_alerts > 0 else "0 False Alarms")
+
+    st.markdown("---")
+
+    # 2. Interactive Charts with View Toggle (Decluttered)
+    chart_c1, chart_c2 = st.columns([2, 1])
+    with chart_c1:
+        st.markdown("##### 📈 Normalized Commodity Price Analytics")
+    with chart_c2:
+        chart_view = st.segmented_control(
+            "Visualization Mode",
+            options=["📈 Fair Price History", "📊 Contract Dispersion", "⚡ Side-by-Side"],
+            default="📈 Fair Price History",
+        )
+
+    if chart_view == "📈 Fair Price History":
+        fig_hist = px.line(
+            df,
+            x="trade_date",
+            y="normalized_price_per_gram",
+            color="symbol",
+            title=f"Historical Fair Price Trends ({'₹/1g 999 Gold' if is_gold else '₹/1g 999 Silver'})",
+            labels={"trade_date": "Trading Date", "normalized_price_per_gram": "Price (₹/g 999)", "symbol": "Contract"},
+            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
+        )
+        fig_hist.update_layout(**PLOTLY_THEME, height=360, margin=dict(l=40, r=20, t=40, b=30), legend=dict(orientation="h", y=1.02, x=1, xanchor="right"))
+        st.plotly_chart(fig_hist, use_container_width=True)
+
+    elif chart_view == "📊 Contract Dispersion":
+        fig_box = px.box(
+            latest_data,
+            x="symbol",
+            y="normalized_price_per_gram",
+            color="symbol",
+            points="all",
+            title=f"Cross-Contract Price Dispersion on {latest_date.strftime('%d %b %Y')} (₹/g)",
+            labels={"normalized_price_per_gram": "₹/g (999)", "symbol": "Contract"},
+            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
+        )
+        fig_box.update_layout(**PLOTLY_THEME, showlegend=False, height=360, margin=dict(l=40, r=20, t=40, b=30))
+        st.plotly_chart(fig_box, use_container_width=True)
+
+    else:  # Side-by-Side
+        c_p1, c_p2 = st.columns([3, 2])
+        with c_p1:
+            fig_hist = px.line(
+                df,
+                x="trade_date",
+                y="normalized_price_per_gram",
+                color="symbol",
+                title="Fair Price Trends (₹/g)",
+                labels={"trade_date": "Trading Date", "normalized_price_per_gram": "Price (₹/g)", "symbol": "Contract"},
+                color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
+            )
+            fig_hist.update_layout(**PLOTLY_THEME, height=320, margin=dict(l=30, r=10, t=35, b=25), showlegend=False)
+            st.plotly_chart(fig_hist, use_container_width=True)
+        with c_p2:
+            fig_box = px.box(
+                latest_data,
+                x="symbol",
+                y="normalized_price_per_gram",
+                color="symbol",
+                points="all",
+                title="Dispersion (₹/g)",
+                labels={"normalized_price_per_gram": "₹/g", "symbol": "Contract"},
+                color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
+            )
+            fig_box.update_layout(**PLOTLY_THEME, showlegend=False, height=320, margin=dict(l=30, r=10, t=35, b=25))
+            st.plotly_chart(fig_box, use_container_width=True)
+
+    st.markdown("---")
+
+    # 3. Quiet Alert Scanner Section
+    col_al1, col_al2 = st.columns([3, 2])
+    with col_al1:
+        st.markdown("##### 🔔 Quiet Alert Scanner (Post-Cost Survival Only)")
+        st.caption("Suppresses raw statistical noise when edge fails to cover fees, slippage, or physical tender locks.")
+    with col_al2:
+        view_filter = st.pills(
+            "Filter Pairs",
+            options=["All Pairs", "Executable Alpha Only", "Tender Lockout", "Fee Traps"],
+            default="All Pairs",
+        )
 
     alerts_df = alert_res["alerts_df"]
     if not alerts_df.empty:
-        if view_filter == "Triggered & Suppressed Only":
-            display_alerts = alerts_df[alerts_df["status"] != "Fair Value (Normal)"].copy()
+        if view_filter == "Executable Alpha Only":
+            display_alerts = alerts_df[alerts_df["status"].str.contains("Active", na=False)].copy()
         elif view_filter == "Tender Lockout":
             display_alerts = alerts_df[alerts_df["status"].str.contains("Tender", na=False)].copy()
-        elif view_filter == "Fair Value":
-            display_alerts = alerts_df[alerts_df["status"] == "Fair Value (Normal)"].copy()
+        elif view_filter == "Fee Traps":
+            display_alerts = alerts_df[alerts_df["status"].str.contains("Fee", na=False)].copy()
         else:
             display_alerts = alerts_df.copy()
 
         if display_alerts.empty:
-            st.info("No spread pairs match the selected filter.")
+            st.info(f"No spread pairs match the '{view_filter}' filter for this date.")
         else:
             show_cols = [
                 "symbol", "near_expiry", "far_expiry", "signal_type", "spread_zscore",
@@ -576,13 +642,13 @@ with tabs[0]:
                 "symbol": "Symbol",
                 "near_expiry": "Near Expiry",
                 "far_expiry": "Far Expiry",
-                "signal_type": "Signal Direction",
+                "signal_type": "Signal",
                 "spread_zscore": "Z-Score",
                 "calendar_spread_inr": "Spread (₹/g)",
-                "gross_edge_inr": "Gross Edge (₹/g)",
-                "round_trip_cost_inr": "Total Cost (₹/g)",
-                "net_edge_inr": "Net Edge (₹/g)",
-                "volume_lots": "Near Vol (Lots)",
+                "gross_edge_inr": "Gross Edge",
+                "round_trip_cost_inr": "Total Cost",
+                "net_edge_inr": "Net Edge",
+                "volume_lots": "Near Vol",
                 "status": "System Status",
                 "reason": "Execution Verdict",
             }, inplace=True)
@@ -624,7 +690,7 @@ with tabs[1]:
             labels={"expiry_date": "Contract Expiry", "volume_lots": "Volume (Lots)"},
             color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
         )
-        fig_vol.update_layout(**PLOTLY_THEME, height=340, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig_vol.update_layout(**PLOTLY_THEME, height=320, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_vol, use_container_width=True)
 
     with col_v2:
@@ -639,44 +705,30 @@ with tabs[1]:
             labels={"expiry_date": "Contract Expiry", "open_interest_lots": "Open Interest (Lots)"},
             color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
         )
-        fig_oi.update_layout(**PLOTLY_THEME, height=340, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig_oi.update_layout(**PLOTLY_THEME, height=320, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_oi, use_container_width=True)
 
     # Tender Warning Callout
-    st.markdown("---")
-    st.markdown("#### ⚠️ MCX Tender Delivery Exclusion Zone")
-    st.markdown("""
-    > [!IMPORTANT]
-    > **Why Commodity Tender Periods Are Dangerous**: On MCX, physical gold delivery begins **5 business days prior to contract expiry**. Holding speculative or arbitrage spread positions into tender triggers steep 25%+ delivery margins, penalty charges, and physical gold vault assignment.
-    > 
-    > **AurumSpread Rule**: The engine completely prohibits new entries within the tender window and triggers an automatic exit to keep trading 100% financially cash-settled.
+    render_html("""
+    <div class='glass-card' style='border-left: 4px solid #EF4444; margin-top: 10px;'>
+        <div style='font-size: 0.9rem; font-weight: 700; color: #EF4444;'>⚠️ MCX TENDER PERIOD PHYSICAL DELIVERY LOCKOUT</div>
+        <div style='font-size: 0.82rem; color: #CBD5E1; margin-top: 4px;'>
+            On MCX, physical bullion delivery starts <b>5 business days prior to contract expiry</b>. Holding speculative or spread positions into the tender window triggers steep 25%+ delivery margins, penalty levies, and physical vault delivery obligations. AurumSpread automatically flags and suppresses entries inside this danger window.
+        </div>
+    </div>
     """)
 
-    tender_active = latest_depth[latest_depth["is_in_tender"]]
-    if not tender_active.empty:
-        st.warning(f"🚨 {len(tender_active)} contract(s) currently in MCX Tender Lockout! Direct trading blocked.")
-        st.dataframe(
-            tender_active[["symbol", "expiry_date", "days_to_expiry", "volume_lots", "open_interest_lots", "turnover_crores"]],
-            use_container_width=True, hide_index=True
-        )
-    else:
-        st.success("✅ All actively tradable near-month contracts are safely outside the MCX 5-day tender lockout window.")
-
 
 # =========================================================
-# TAB 3: FUTURES CURVE & COMEX PARITY
+# TAB 3: FUTURES CURVE, CARRY & COMEX PARITY
 # =========================================================
 with tabs[2]:
-    st.subheader("Forward Term Structure Curve, Implied Carry & COMEX Import Parity")
-    st.caption("Constructs the forward term structure, separates roll-down from alpha, and analyzes India Landed Basis vs international COMEX gold.")
+    st.subheader("Forward Term Structure, Annualized Carry & COMEX Parity")
+    st.caption("Separates predictable time-value roll-down from real mispricing and monitors cross-border landed import parity.")
 
-    c_sym_col, _ = st.columns([1, 2])
-    with c_sym_col:
-        selected_curve_sym = st.selectbox(
-            "Select Contract Curve",
-            sorted(df["symbol"].unique()),
-            index=0,
-        )
+    col_s1, col_s2 = st.columns([1, 3])
+    with col_s1:
+        selected_curve_sym = st.selectbox("Curve Instrument", sorted(df["symbol"].unique()), index=0)
 
     curve_df = calculate_term_structure(df, trade_date=latest_date, symbol=selected_curve_sym)
 
@@ -711,10 +763,10 @@ with tabs[2]:
             ))
             fig_curve.update_layout(
                 **PLOTLY_THEME,
-                height=350,
+                height=320,
                 xaxis_title="Contract Expiry Date",
-                yaxis_title="Normalized Price (₹/1g 999)",
-                margin=dict(l=40, r=20, t=40, b=40),
+                yaxis_title="Normalized Price (₹/g)",
+                margin=dict(l=40, r=20, t=30, b=30),
             )
             st.plotly_chart(fig_curve, use_container_width=True)
 
@@ -730,23 +782,24 @@ with tabs[2]:
                 "days_to_expiry": "DTE",
                 "close": "Close (₹)",
                 "normalized_price_per_gram": "Norm (₹/g)",
-                "spread_vs_front_inr": "Spread (₹/g)",
+                "spread_vs_front_inr": "Spread",
                 "annualized_carry_pct": "Carry (% p.a.)",
                 "market_regime": "Regime",
             }, inplace=True)
             disp_curve["Carry (% p.a.)"] = disp_curve["Carry (% p.a.)"].apply(lambda x: f"{x:.2f}%")
-            disp_curve["Spread (₹/g)"] = disp_curve["Spread (₹/g)"].apply(lambda x: f"₹{x:,.1f}")
+            disp_curve["Spread"] = disp_curve["Spread"].apply(lambda x: f"₹{x:,.1f}")
             st.dataframe(disp_curve, use_container_width=True, hide_index=True)
 
     st.markdown("---")
 
-    # 🌐 NEW: MCX vs COMEX Gold Import Parity & Landed Basis Model
-    st.markdown("### 🌐 MCX vs COMEX Import Parity & India Gold Basis")
+    # 🌐 MCX vs COMEX Import Parity & Landed Basis Model
+    st.markdown(f"### 🌐 MCX vs COMEX Import Parity & India {'Gold' if is_gold else 'Silver'} Basis")
     st.caption("Institutional cross-border pricing: factors in COMEX spot $/oz, USD/INR, 5% BCD + 1% AIDC + 10% SWC tariffs, and domestic GST.")
 
     col_cp1, col_cp2 = st.columns([1, 2])
     with col_cp1:
-        comex_input = st.number_input("COMEX Gold ($/troy oz)", value=2650.0, step=10.0)
+        default_comex = 2650.0 if is_gold else 31.50
+        comex_input = st.number_input(f"COMEX {'Gold' if is_gold else 'Silver'} ($/troy oz)", value=default_comex, step=5.0 if is_gold else 0.5)
         usdinr_input = st.number_input("USD/INR Reference Rate", value=84.10, step=0.10)
         customs_input = st.number_input("Customs Duty (BCD %)", value=5.0, step=0.5)
 
@@ -760,7 +813,7 @@ with tabs[2]:
     with col_cp2:
         pk1, pk2, pk3 = st.columns(3)
         pk1.metric("Landed Parity (Ex-GST)", f"₹{parity_calc['landed_price_ex_gst_per_g']:,.2f}/g", "Theoretical Import Cost")
-        pk2.metric("Current MCX Futures", f"₹{avg_norm_price:,.2f}/g", "Domestic Benchmark")
+        pk2.metric("Current MCX Domestic", f"₹{avg_norm_price:,.2f}/g", "Domestic Benchmark")
         pk3.metric("India Basis (Premium/Discount)", f"₹{parity_calc['basis_inr_per_g']:+,.2f}/g", f"{parity_calc['basis_pct']:+.2f}%")
 
         render_html(f"""
@@ -770,7 +823,7 @@ with tabs[2]:
         </div>
         """)
 
-    # Historical Basis timeline chart
+    # Historical Basis timeline chart (for Gold)
     if is_gold:
         hist_parity_df = generate_historical_parity_series(df, base_comex_usd=comex_input, base_usdinr=usdinr_input)
         fig_basis = px.bar(
@@ -782,7 +835,7 @@ with tabs[2]:
             color="basis_inr_per_g",
             color_continuous_scale=["#EF4444", "#38BDF8", "#10B981"],
         )
-        fig_basis.update_layout(**PLOTLY_THEME, height=300, margin=dict(l=40, r=20, t=40, b=30))
+        fig_basis.update_layout(**PLOTLY_THEME, height=280, margin=dict(l=40, r=20, t=35, b=25))
         st.plotly_chart(fig_basis, use_container_width=True)
 
 
@@ -884,11 +937,11 @@ with tabs[3]:
 
         fig_equity.update_layout(
             **PLOTLY_THEME,
-            height=380,
+            height=340,
             xaxis_title="Trading Date",
             yaxis_title="Cumulative P&L (₹)",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=40, r=20, t=50, b=40),
+            margin=dict(l=40, r=20, t=40, b=30),
         )
         st.plotly_chart(fig_equity, use_container_width=True)
 
@@ -913,11 +966,11 @@ with tabs[3]:
                         </span>
                     </div>
                 </div>
-                <hr style='border-color: #1F2E47; margin: 12px 0;'>
+                <hr style='border-color: #1F2E47; margin: 10px 0;'>
                 <div style='font-size: 0.85rem; color: #CBD5E1;'>
-                    • Current Configured Friction: <b>₹{current_friction:.2f}/leg</b> (Fee: ₹{sb_cost_per_leg} + Slippage: ₹{sb_slippage_per_leg})<br>
+                    • Current Friction: <b>₹{current_friction:.2f}/leg</b> (Fee: ₹{sb_cost_per_leg} + Slippage: ₹{sb_slippage_per_leg})<br>
                     • Friction Safety Buffer: <b>₹{max(0.0, be_cost - current_friction):.2f}/leg</b><br>
-                    • <i>If total transaction costs, brokerage, and slippage exceed <b>₹{be_cost:.2f}/leg</b>, strategy P&L turns negative.</i>
+                    • <i>If total costs exceed <b>₹{be_cost:.2f}/leg</b>, strategy P&L turns negative.</i>
                 </div>
             </div>
             """)
@@ -928,12 +981,12 @@ with tabs[3]:
             trades_count = bt_summary["total_trades"]
             
             funnel_fig = go.Figure(go.Funnel(
-                y=["Gross Statistical Anomalies", "Survives Tender Lockout", "Survives Liquidity Filter", "Realized Executed Trades"],
+                y=["Gross Anomalies", "Tender Filter", "Liquidity Filter", "Executed Trades"],
                 x=[raw_deviations, max(trades_count, int(raw_deviations * 0.7)), max(trades_count, int(raw_deviations * 0.45)), trades_count],
                 textinfo="value+percent initial",
                 marker=dict(color=["#38BDF8", "#F59E0B", "#A855F7", "#10B981"]),
             ))
-            funnel_fig.update_layout(**PLOTLY_THEME, height=240, margin=dict(l=40, r=20, t=10, b=10))
+            funnel_fig.update_layout(**PLOTLY_THEME, height=220, margin=dict(l=40, r=20, t=10, b=10))
             st.plotly_chart(funnel_fig, use_container_width=True)
 
         # 📋 2-Leg Order Ticket Section
@@ -957,14 +1010,14 @@ with tabs[3]:
             st.dataframe(pd.DataFrame(ticket_obj["legs"]), use_container_width=True, hide_index=True)
 
         with t_col2:
-            st.markdown(f"""
+            render_html(f"""
             <div class='glass-card-gold'>
                 <div style='font-size: 0.8rem; color: #94A3B8;'>ESTIMATED SPREAD MARGIN</div>
                 <div style='font-size: 1.8rem; font-weight: 700; color: #F5C542;'>₹{ticket_obj['estimated_spread_margin_inr']:,.0f}</div>
                 <div style='font-size: 0.8rem; color: #10B981;'>75% Hedge Relief Applied</div>
                 <div style='font-size: 0.75rem; color: #94A3B8; margin-top: 4px;'>Unhedged Margin: ₹{ticket_obj['estimated_unhedged_margin_inr']:,.0f}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """)
             
             kite_json = json.dumps(ticket_obj["zerodha_kite_json"], indent=2)
             st.download_button("⬇️ Download Kite JSON Payload", data=kite_json, file_name=f"{selected_bt_sym}_spread_order.json", mime="application/json", use_container_width=True)
@@ -1026,15 +1079,12 @@ with tabs[4]:
 
     # Chat Input Box
     if user_input := st.chat_input("Ask Aurum Copilot (e.g., 'How to hedge 500g of gold?', 'Generate Zerodha order ticket')"):
-        # Append user message
         st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        # Generate response using Copilot
         with st.chat_message("assistant"):
             bot_reply = copilot.query(user_input)
             st.markdown(bot_reply)
 
-        # Append assistant message
         st.session_state.messages.append({"role": "assistant", "content": bot_reply})
