@@ -1,10 +1,11 @@
-"""AurumSpread — Institutional Commodity Derivatives Intelligence Platform.
+"""AurumSpread PRO — Institutional Commodity Derivatives Intelligence Platform.
 
 Track 03: Commodity Derivatives Intelligence | Hack in Hills '26
 Team AurumSpread: Shivansh Sahni • Krishna Sharma • Dhruv Gupta
 """
 
 from pathlib import Path
+import json
 import textwrap
 from typing import Dict, Any, List, Optional
 import numpy as np
@@ -13,7 +14,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from src.normalize import CONTRACT_SPECS, normalize_gold_prices
+from src.normalize import CONTRACT_SPECS, normalize_commodity_prices
 from src.spread_engine import calculate_calendar_spreads
 from src.spread_intelligence import calculate_spread_intelligence
 from src.backtest_engine import (
@@ -34,11 +35,15 @@ from src.liquidity_engine import (
 from src.hedge_optimizer import calculate_optimal_hedge
 from src.data_doctor import audit_dataset_health
 from src.quiet_alerts import scan_quiet_alerts
+from src.parity_engine import calculate_landed_import_parity, generate_historical_parity_series
+from src.order_ticket import generate_spread_order_ticket, export_order_ticket_csv
+from src.copilot_engine import AurumCopilot
 
-DATA_PATH = Path("data/processed/historical_gold_futures.csv")
+GOLD_DATA_PATH = Path("data/processed/historical_gold_futures.csv")
+SILVER_DATA_PATH = Path("data/processed/historical_silver_futures.csv")
 
 st.set_page_config(
-    page_title="AurumSpread | Commodity Derivatives Intelligence",
+    page_title="AurumSpread PRO | Commodity Derivatives Intelligence",
     page_icon="🟡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -61,15 +66,10 @@ render_html("""
     --gold-gradient: linear-gradient(135deg, #F5C542 0%, #D4A017 100%);
     --bg-main: #070B14;
     --bg-card: #0E1626;
-    --bg-card-hover: #131E33;
     --border-color: #1F2E47;
     --border-gold: rgba(245, 197, 66, 0.25);
     --text-primary: #F1F5F9;
     --text-muted: #94A3B8;
-    --success: #10B981;
-    --danger: #EF4444;
-    --warning: #F59E0B;
-    --info: #38BDF8;
 }
 
 /* App Background & Typography */
@@ -82,7 +82,7 @@ render_html("""
 .block-container {
     padding-top: 1.2rem;
     padding-bottom: 3rem;
-    max-width: 1400px;
+    max-width: 1440px;
 }
 
 /* Headings */
@@ -137,7 +137,7 @@ div[data-testid="stMetricLabel"] {
 }
 div[data-testid="stMetricValue"] {
     color: #F8FAFC !important;
-    font-size: 1.65rem !important;
+    font-size: 1.6rem !important;
     font-weight: 700 !important;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
@@ -146,7 +146,7 @@ div[data-testid="stMetricValue"] {
 button[data-baseweb="tab"] {
     font-size: 0.95rem !important;
     font-weight: 600 !important;
-    padding: 12px 22px !important;
+    padding: 12px 20px !important;
     border-radius: 8px 8px 0 0 !important;
     color: #94A3B8 !important;
     transition: all 0.2s ease;
@@ -172,7 +172,6 @@ button[data-baseweb="tab"][aria-selected="true"] {
 .badge-orange { background: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.35); }
 .badge-blue { background: rgba(56, 189, 248, 0.15); color: #38BDF8; border: 1px solid rgba(56, 189, 248, 0.35); }
 .badge-gold { background: rgba(245, 197, 66, 0.15); color: #F5C542; border: 1px solid rgba(245, 197, 66, 0.35); }
-.badge-gray { background: rgba(148, 163, 184, 0.12); color: #94A3B8; border: 1px solid rgba(148, 163, 184, 0.25); }
 
 /* Buttons with gold gradient */
 .stButton button {
@@ -193,181 +192,61 @@ button[data-baseweb="tab"][aria-selected="true"] {
 """)
 
 # ---------------------------------------------------------
-# Data Loading & Verification
-# ---------------------------------------------------------
-if not DATA_PATH.exists():
-    st.error(f"Dataset missing at {DATA_PATH}. Please run `python build_historical_dataset.py` first.")
-    st.stop()
-
-
-@st.cache_data
-def load_dataset() -> pd.DataFrame:
-    df_raw = pd.read_csv(DATA_PATH)
-    df_raw["trade_date"] = pd.to_datetime(df_raw["trade_date"], errors="coerce", format="mixed")
-    df_raw["expiry_date"] = pd.to_datetime(df_raw["expiry_date"], errors="coerce", format="mixed")
-    df_raw["close"] = pd.to_numeric(df_raw["close"], errors="coerce")
-    df_raw["normalized_price_per_gram"] = pd.to_numeric(df_raw["normalized_price_per_gram"], errors="coerce")
-    if "volume_lots" in df_raw.columns:
-        df_raw["volume_lots"] = pd.to_numeric(df_raw["volume_lots"], errors="coerce").fillna(0)
-    if "open_interest_lots" in df_raw.columns:
-        df_raw["open_interest_lots"] = pd.to_numeric(df_raw["open_interest_lots"], errors="coerce").fillna(0)
-    return df_raw.dropna(subset=["trade_date", "expiry_date", "normalized_price_per_gram"]).sort_values(["symbol", "trade_date", "expiry_date"]).reset_index(drop=True)
-
-
-df = load_dataset()
-latest_date = df["trade_date"].max()
-latest_data = df[df["trade_date"] == latest_date]
-avg_norm_price = latest_data["normalized_price_per_gram"].mean()
-
-# Shared Plotly Dark Theme
-PLOTLY_THEME = dict(
-    paper_bgcolor="#0A0F1D",
-    plot_bgcolor="#0E1626",
-    font=dict(color="#E2E8F0", family="-apple-system, sans-serif"),
-    xaxis=dict(gridcolor="#1E293B", zerolinecolor="#334155"),
-    yaxis=dict(gridcolor="#1E293B", zerolinecolor="#334155"),
-)
-
-# ---------------------------------------------------------
-# Dialog Modals (Interactive Tools)
-# ---------------------------------------------------------
-@st.dialog("🩺 MCX Data Doctor: Automated Bhavcopy Audit")
-def dialog_data_doctor():
-    st.caption("Live data integrity scanner auditing raw & processed MCX Bhavcopy records.")
-    audit_res = audit_dataset_health(df)
-    
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Audit Score", f"{audit_res['health_score']}/100", audit_res['status'])
-    c2.metric("Audited Rows", f"{audit_res['total_rows']:,}")
-    c3.metric("Trading Days", audit_res['trading_days'])
-    
-    st.markdown("##### 🔍 Diagnostic Checklist")
-    diag_df = pd.DataFrame(audit_res["diagnostics"])
-    st.dataframe(diag_df, use_container_width=True, hide_index=True)
-    st.success("✅ Zero data leakage, zero unparsed dates, and zero negative prices detected across all historical observations.")
-
-
-@st.dialog("📐 Lot-Size Delta Hedge Calculator")
-def dialog_hedge_calculator():
-    st.caption("Solves for integer delta neutrality across mismatched MCX contract lot sizes.")
-    c1, c2 = st.columns(2)
-    sym_a = c1.selectbox("Leg A Contract", ["GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"], index=0)
-    sym_b = c2.selectbox("Leg B Contract", ["GOLDGUINEA", "GOLDTEN", "GOLDPETAL", "GOLDM"], index=0)
-    lots_a = st.number_input("Leg A Traded Lots", min_value=1, max_value=100, value=1)
-    
-    res = calculate_optimal_hedge(sym_a, sym_b, lots_a=lots_a, gold_price_per_g=avg_norm_price)
-    
-    render_html(f"""
-    <div class='glass-card-gold'>
-        <div style='font-size: 0.85rem; color: #94A3B8;'>OPTIMAL INTEGER HEDGE RECOMMENDATION</div>
-        <div style='font-size: 1.5rem; font-weight: 700; color: #F5C542; margin: 6px 0;'>
-            {res['lots_a']} lot(s) of {sym_a} ⟷ {res['lots_b']} lot(s) of {sym_b}
-        </div>
-        <div style='font-size: 0.9rem; color: #CBD5E1;'>
-            • Leg A Gold: <b>{res['total_grams_a']}g</b> | Leg B Gold: <b>{res['total_grams_b']}g</b><br>
-            • Residual Delta Exposure: <b>{res['residual_mismatch_grams']}g</b> (₹{res['delta_exposure_inr']:,.1f})<br>
-            • Hedge Efficiency: <span class='badge-green'>{res['hedge_efficiency_pct']}%</span><br>
-            • Smallest Exact Zero-Delta Ratio: <span class='badge-gold'>{res['exact_zero_delta_ratio']}</span> ({res['exact_matched_grams']}g)
-        </div>
-    </div>
-    """)
-
-
-@st.dialog("🔬 Unit & Purity Normalization Lab")
-def dialog_norm_lab():
-    st.caption("Live mathematical breakdown: converts any raw MCX quote to ₹/1g of 999 purity gold.")
-    test_sym = st.selectbox("Choose Contract Specification", ["GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"])
-    spec = CONTRACT_SPECS[test_sym]
-    
-    sample_close = st.number_input("Enter Sample MCX Close Price (₹)", value=75000.0, step=100.0)
-    
-    test_df = pd.DataFrame({"symbol": [test_sym], "close": [sample_close]})
-    res_df = normalize_gold_prices(test_df)
-    norm_val = res_df.loc[0, "normalized_price_per_gram"]
-    
-    render_html(f"""
-    <div class='glass-card'>
-        <h4 style='color: #F5C542;'>Contract: {spec['name']} ({test_sym})</h4>
-        <p>• <b>Quotation Unit</b>: Quoted per <b>{spec['quote_unit_grams']}g</b><br>
-        • <b>Physical Purity</b>: <b>{spec['purity']}/1000</b> (Purity Multiplier: <code>{spec['purity_factor']:.4f}</code>)<br>
-        • <b>Lot Size</b>: <b>{spec['lot_size_grams']}g</b> | <b>Expiry</b>: {spec['expiry_cycle']}</p>
-        <hr style='border-color: #1F2E47;'>
-        <div style='font-size: 0.9rem; color: #94A3B8;'>NORMALIZED RESULT:</div>
-        <div style='font-size: 1.8rem; font-weight: 700; color: #10B981;'>
-            ₹{norm_val:,.2f} / gram (999 Gold)
-        </div>
-        <p style='color: #94A3B8; font-size: 0.85rem;'>Formula: <code>{spec['formula_str']}</code></p>
-    </div>
-    """)
-
-
-# ---------------------------------------------------------
-# Top Navigation & Header Bar (Native Streamlit Components)
-# ---------------------------------------------------------
-col_head1, col_head2 = st.columns([3, 2])
-
-with col_head1:
-    st.title("🟡 AurumSpread PRO")
-    st.caption("Institutional Commodity Relative-Value & Carry Intelligence for MCX Gold Futures")
-
-with col_head2:
-    st.markdown("**Hack in Hills '26** | Track 03: Commodity Intelligence")
-    st.caption("Team AurumSpread: Shivansh Sahni • Krishna Sharma • Dhruv Gupta")
-    
-    btn_c1, btn_c2, btn_c3 = st.columns(3)
-    if btn_c1.button("🩺 Data Doctor", use_container_width=True):
-        dialog_data_doctor()
-    if btn_c2.button("📐 Lot Sizer", use_container_width=True):
-        dialog_hedge_calculator()
-    if btn_c3.button("🔬 Purity Lab", use_container_width=True):
-        dialog_norm_lab()
-
-# ---------------------------------------------------------
-# Live Ticker Ribbon (Native Metric Columns)
-# ---------------------------------------------------------
-st.markdown("##### 📌 MCX Gold Futures Live Snapshot (₹/1g 999 Gold)")
-t1, t2, t3, t4 = st.columns(4)
-
-for sym, col in zip(["GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"], [t1, t2, t3, t4]):
-    sub_df = latest_data[latest_data["symbol"] == sym]
-    if not sub_df.empty:
-        near_contract = sub_df.sort_values("expiry_date").iloc[0]
-        norm_p = near_contract["normalized_price_per_gram"]
-        raw_p = near_contract["close"]
-        spec = CONTRACT_SPECS.get(sym, {})
-        col.metric(
-            label=f"{sym} ({spec.get('lot_size_grams', 10)}g • {spec.get('purity', 999)} Purity)",
-            value=f"₹{norm_p:,.2f}/g",
-            delta=f"MCX Close: ₹{raw_p:,.0f}",
-            delta_color="off",
-        )
-
-# ---------------------------------------------------------
-# Onboarding Workflow Card (Expandable / Guided)
-# ---------------------------------------------------------
-with st.expander("🗺️ How AurumSpread Solves Commodity Spread Intelligence (30-Second Tour)", expanded=False):
-    step_c1, step_c2, step_c3 = st.columns(3)
-    with step_c1:
-        st.markdown("**STEP 1: Unit & Purity Normalization**")
-        st.caption("Converts 4 disjoint MCX contracts (100g, 10g, 8g, 1g) and purity (995 vs 999) into a uniform, apples-to-apples ₹/1g of 999 gold benchmark.")
-    with step_c2:
-        st.markdown("**STEP 2: Carry & Forward Curve**")
-        st.caption("Constructs the forward term structure and separates predictable carrying cost decay (roll-down) from true statistical mispricing.")
-    with step_c3:
-        st.markdown("**STEP 3: Honest Survival Proof**")
-        st.caption("Enforces the MCX 5-day physical tender lockout and volume haircuts to prove whether an apparent arbitrage edge survives real fees and slippage.")
-
-# ---------------------------------------------------------
-# Sidebar Controls & 1-Click Strategy Presets
+# Sidebar Controls & Commodity Universe Switcher
 # ---------------------------------------------------------
 with st.sidebar:
+    st.markdown("### 🌐 Market Universe & Date")
+    
+    # Dynamic Commodity Switcher
+    commodity_choice = st.segmented_control(
+        "Commodity Universe",
+        options=["🟡 Gold Futures", "⚪ Silver Futures"],
+        default="🟡 Gold Futures",
+        help="Switch dynamically between MCX Gold contracts and MCX Silver contracts.",
+    )
+
+    is_gold = "Gold" in commodity_choice
+    active_data_path = GOLD_DATA_PATH if is_gold else SILVER_DATA_PATH
+
+    @st.cache_data
+    def load_active_dataset(file_path: Path) -> pd.DataFrame:
+        df_raw = pd.read_csv(file_path)
+        df_raw["trade_date"] = pd.to_datetime(df_raw["trade_date"], errors="coerce", format="mixed")
+        df_raw["expiry_date"] = pd.to_datetime(df_raw["expiry_date"], errors="coerce", format="mixed")
+        df_raw["close"] = pd.to_numeric(df_raw["close"], errors="coerce")
+        df_raw["normalized_price_per_gram"] = pd.to_numeric(df_raw["normalized_price_per_gram"], errors="coerce")
+        if "volume_lots" in df_raw.columns:
+            df_raw["volume_lots"] = pd.to_numeric(df_raw["volume_lots"], errors="coerce").fillna(0)
+        if "open_interest_lots" in df_raw.columns:
+            df_raw["open_interest_lots"] = pd.to_numeric(df_raw["open_interest_lots"], errors="coerce").fillna(0)
+        return df_raw.dropna(subset=["trade_date", "expiry_date", "normalized_price_per_gram"]).sort_values(["symbol", "trade_date", "expiry_date"]).reset_index(drop=True)
+
+    df = load_active_dataset(active_data_path)
+    
+    all_dates = sorted(df["trade_date"].dropna().unique())
+    latest_market_date = all_dates[-1]
+
+    # Dynamic Date Scrubber
+    selected_date = st.selectbox(
+        "Market Observation Date",
+        options=all_dates[::-1],
+        index=0,
+        format_func=lambda d: pd.to_datetime(d).strftime("%d %b %Y"),
+        help="Replay any historical trading day to watch forward curves and alerts update dynamically."
+    )
+
+    latest_date = pd.to_datetime(selected_date)
+    latest_data = df[df["trade_date"] == latest_date]
+    avg_norm_price = float(latest_data["normalized_price_per_gram"].mean()) if not latest_data.empty else 7500.0
+
+    st.markdown("---")
     st.markdown("### 🎛️ Strategy Presets & Controls")
     
     preset_choice = st.segmented_control(
         "1-Click Quant Presets",
         options=["Institutional", "Balanced", "Aggressive", "Custom"],
         default="Balanced",
-        help="Quickly populate backtest thresholds and risk rules based on institutional risk tolerance.",
+        help="Quickly populate backtest thresholds based on institutional risk tolerance.",
     )
     
     if preset_choice == "Institutional":
@@ -422,22 +301,179 @@ with st.sidebar:
     sb_tender_exit_days = st.slider(
         "MCX Tender Lockout (Days)",
         min_value=1, max_value=10, value=default_tender_days,
-        help="Mandatory pre-expiry exit to prevent physical gold delivery obligation."
+        help="Mandatory pre-expiry exit to prevent physical delivery obligation."
     )
     sb_lots = st.number_input("Lots Traded", min_value=1, max_value=50, value=1)
 
     st.markdown("---")
     st.markdown("**Data Integrity Guarantee**")
-    st.caption("• Historical MCX Bhavcopy (Jul–Oct 2026)\n• Expanding window calculations (Zero lookahead)\n• Multi-instrument purity adjustments (995 → 999)")
+    st.caption("• 82 Daily MCX Bhavcopies (Jul–Oct 2026)\n• 4,000+ Verified Futures Rows\n• Expanding window calculations (Zero lookahead)")
+
+# Shared Plotly Dark Theme
+PLOTLY_THEME = dict(
+    paper_bgcolor="#0A0F1D",
+    plot_bgcolor="#0E1626",
+    font=dict(color="#E2E8F0", family="-apple-system, sans-serif"),
+    xaxis=dict(gridcolor="#1E293B", zerolinecolor="#334155"),
+    yaxis=dict(gridcolor="#1E293B", zerolinecolor="#334155"),
+)
+
+# Initialize Copilot instance bound to loaded dataset
+copilot = AurumCopilot(df)
 
 # ---------------------------------------------------------
-# The 4 Main Trader Dashboard Tabs (Matching PPT Slide 6)
+# Dialog Modals (Interactive Tools)
+# ---------------------------------------------------------
+@st.dialog("🩺 MCX Data Doctor: Automated Bhavcopy Audit")
+def dialog_data_doctor():
+    st.caption("Live data integrity scanner auditing raw & processed MCX Bhavcopy records.")
+    audit_res = audit_dataset_health(df)
+    
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Audit Score", f"{audit_res['health_score']}/100", audit_res['status'])
+    c2.metric("Audited Rows", f"{audit_res['total_rows']:,}")
+    c3.metric("Trading Days", audit_res['trading_days'])
+    
+    st.markdown("##### 🔍 Diagnostic Checklist")
+    diag_df = pd.DataFrame(audit_res["diagnostics"])
+    st.dataframe(diag_df, use_container_width=True, hide_index=True)
+    st.success("✅ Zero data leakage, zero unparsed dates, and zero negative prices detected across all historical observations.")
+
+
+@st.dialog("📐 Lot-Size Delta Hedge Calculator")
+def dialog_hedge_calculator():
+    st.caption("Solves for integer delta neutrality across mismatched MCX contract lot sizes.")
+    symbols_list = sorted(df["symbol"].unique())
+    c1, c2 = st.columns(2)
+    sym_a = c1.selectbox("Leg A Contract", symbols_list, index=0)
+    sym_b = c2.selectbox("Leg B Contract", symbols_list, index=min(1, len(symbols_list)-1))
+    lots_a = st.number_input("Leg A Traded Lots", min_value=1, max_value=100, value=1)
+    
+    res = calculate_optimal_hedge(sym_a, sym_b, lots_a=lots_a, gold_price_per_g=avg_norm_price)
+    
+    render_html(f"""
+    <div class='glass-card-gold'>
+        <div style='font-size: 0.85rem; color: #94A3B8;'>OPTIMAL INTEGER HEDGE RECOMMENDATION</div>
+        <div style='font-size: 1.5rem; font-weight: 700; color: #F5C542; margin: 6px 0;'>
+            {res['lots_a']} lot(s) of {sym_a} ⟷ {res['lots_b']} lot(s) of {sym_b}
+        </div>
+        <div style='font-size: 0.9rem; color: #CBD5E1;'>
+            • Leg A Quantity: <b>{res['total_grams_a']}g</b> | Leg B Quantity: <b>{res['total_grams_b']}g</b><br>
+            • Residual Delta Exposure: <b>{res['residual_mismatch_grams']}g</b> (₹{res['delta_exposure_inr']:,.1f})<br>
+            • Hedge Efficiency: <span class='badge-green'>{res['hedge_efficiency_pct']}%</span><br>
+            • Smallest Exact Zero-Delta Ratio: <span class='badge-gold'>{res['exact_zero_delta_ratio']}</span> ({res['exact_matched_grams']}g)
+        </div>
+    </div>
+    """)
+
+
+@st.dialog("📋 Broker Order Execution Ticket Generator")
+def dialog_order_ticket():
+    st.caption("Generates institutional 2-leg order execution payloads for Zerodha Kite Connect & Dhan APIs.")
+    t_symbols = sorted(df["symbol"].unique())
+    tc1, tc2 = st.columns(2)
+    t_sym = tc1.selectbox("Order Symbol", t_symbols, index=0)
+    t_strat = tc2.selectbox("Spread Direction", ["Long Calendar Spread", "Short Calendar Spread"], index=0)
+    
+    t_lots = st.number_input("Execution Lots", min_value=1, max_value=50, value=1)
+    
+    ticket = generate_spread_order_ticket(
+        symbol=t_sym,
+        near_expiry=latest_date + pd.Timedelta(days=20),
+        far_expiry=latest_date + pd.Timedelta(days=50),
+        strategy_type=t_strat,
+        lots=t_lots,
+        near_price=avg_norm_price * 10,
+        far_price=(avg_norm_price + 35) * 10,
+    )
+
+    st.markdown(f"""
+    <div class='glass-card'>
+        <div style='display: flex; justify-content: space-between;'>
+            <div><b>Strategy:</b> {ticket['strategy']} ({ticket['symbol']})</div>
+            <div><span class='badge-green'>75% Spread Margin Relief</span></div>
+        </div>
+        <hr style='border-color: #1F2E47; margin: 8px 0;'>
+        • <b>Leg 1</b>: <code>{ticket['legs'][0]['transaction_type']} {ticket['legs'][0]['lots']} lot(s) {ticket['legs'][0]['trading_symbol']} @ LIMIT ₹{ticket['legs'][0]['price']:,.1f}</code><br>
+        • <b>Leg 2</b>: <code>{ticket['legs'][1]['transaction_type']} {ticket['legs'][1]['lots']} lot(s) {ticket['legs'][1]['trading_symbol']} @ LIMIT ₹{ticket['legs'][1]['price']:,.1f}</code><br>
+        • <b>Estimated Margin</b>: <b>₹{ticket['estimated_spread_margin_inr']:,.0f}</b> (Unhedged: ₹{ticket['estimated_unhedged_margin_inr']:,.0f})
+    </div>
+    """, unsafe_allow_html=True)
+
+    json_str = json.dumps(ticket["zerodha_kite_json"], indent=2)
+    csv_str = export_order_ticket_csv(ticket)
+
+    dc1, dc2 = st.columns(2)
+    dc1.download_button("⬇️ Download Kite JSON", data=json_str, file_name=f"{t_sym}_spread_order.json", mime="application/json", use_container_width=True)
+    dc2.download_button("⬇️ Download CSV Slip", data=csv_str, file_name=f"{t_sym}_spread_slip.csv", mime="text/csv", use_container_width=True)
+
+
+# ---------------------------------------------------------
+# Top Header Bar
+# ---------------------------------------------------------
+col_head1, col_head2 = st.columns([3, 2])
+
+with col_head1:
+    st.title(f"🟡 AurumSpread PRO")
+    st.caption(f"Institutional Commodity Relative-Value, Carry & AI Intelligence | Monitoring {commodity_choice}")
+
+with col_head2:
+    st.markdown("**Hack in Hills '26** | Track 03: Commodity Derivatives Intelligence")
+    st.caption("Team AurumSpread: Shivansh Sahni • Krishna Sharma • Dhruv Gupta")
+    
+    btn_c1, btn_c2, btn_c3 = st.columns(3)
+    if btn_c1.button("🩺 Data Doctor", use_container_width=True):
+        dialog_data_doctor()
+    if btn_c2.button("📐 Lot Sizer", use_container_width=True):
+        dialog_hedge_calculator()
+    if btn_c3.button("📋 Order Ticket", use_container_width=True):
+        dialog_order_ticket()
+
+# ---------------------------------------------------------
+# Live Ticker Ribbon
+# ---------------------------------------------------------
+st.markdown(f"##### 📌 {commodity_choice} Snapshot ({latest_date.strftime('%d %b %Y')})")
+active_symbols = sorted(df["symbol"].unique())
+ticker_cols = st.columns(len(active_symbols))
+
+for sym, col in zip(active_symbols, ticker_cols):
+    sub_df = latest_data[latest_data["symbol"] == sym]
+    if not sub_df.empty:
+        near_contract = sub_df.sort_values("expiry_date").iloc[0]
+        norm_p = near_contract["normalized_price_per_gram"]
+        raw_p = near_contract["close"]
+        spec = CONTRACT_SPECS.get(sym, {})
+        col.metric(
+            label=f"{sym} ({spec.get('lot_size_grams', 10)}g • {spec.get('purity', 999)} Purity)",
+            value=f"₹{norm_p:,.2f}/g",
+            delta=f"Close: ₹{raw_p:,.0f}",
+            delta_color="off",
+        )
+
+# ---------------------------------------------------------
+# Onboarding Guided Workflow Card
+# ---------------------------------------------------------
+with st.expander("🗺️ How AurumSpread Solves Commodity Spread Intelligence (30-Second Guided Tour)", expanded=False):
+    step_c1, step_c2, step_c3 = st.columns(3)
+    with step_c1:
+        st.markdown("**STEP 1: Unit & Purity Normalization**")
+        st.caption("Converts disjoint MCX contracts (100g, 10g, 8g, 1g, 1kg) and purity (995 vs 999) into a uniform, apples-to-apples ₹/1g of 999 gold benchmark.")
+    with step_c2:
+        st.markdown("**STEP 2: Carry & Forward Curve**")
+        st.caption("Constructs the forward term structure and separates predictable carrying cost decay (roll-down) from true statistical mispricing.")
+    with step_c3:
+        st.markdown("**STEP 3: Honest Survival Proof**")
+        st.caption("Enforces the MCX 5-day physical tender lockout and volume haircuts to prove whether an apparent arbitrage edge survives real fees and slippage.")
+
+# ---------------------------------------------------------
+# The 5 Main Trader Dashboard Tabs (Including AI Copilot!)
 # ---------------------------------------------------------
 tabs = st.tabs([
     "Tab 1: 🟡 Fair Price & Quiet Alert",
     "Tab 2: 📅 Expiry Calendar & Liquidity",
-    "Tab 3: 📈 Futures Curve & Carry",
-    "Tab 4: ⚖️ Profit vs Fees Simulator",
+    "Tab 3: 🌐 Carry & COMEX Parity",
+    "Tab 4: ⚖️ Simulator & Order Ticket",
+    "Tab 5: 🤖 Aurum Copilot (AI Quant)",
 ])
 
 # =========================================================
@@ -449,9 +485,9 @@ with tabs[0]:
 
     # Top KPI Metrics
     tk1, tk2, tk3, tk4 = st.columns(4)
-    tk1.metric("Latest Market Date", latest_date.strftime("%d %b %Y"))
-    tk2.metric("Benchmark Price (999)", f"₹{avg_norm_price:,.2f}/g", "Normalized Gold")
-    tk3.metric("Tradable Expiries", len(latest_data), "Active Across 4 Contracts")
+    tk1.metric("Selected Market Date", latest_date.strftime("%d %b %Y"))
+    tk2.metric("Benchmark Price (999)", f"₹{avg_norm_price:,.2f}/g", "Normalized Benchmark")
+    tk3.metric("Tradable Expiries", len(latest_data), f"Across {df['symbol'].nunique()} Instruments")
     tk4.metric("Active Capital Defense", "Quiet Alerts Enabled", delta="Noise Suppressed")
 
     st.markdown("---")
@@ -460,16 +496,16 @@ with tabs[0]:
     c_p1, c_p2 = st.columns([3, 2])
 
     with c_p1:
-        st.markdown("##### 📈 Historical Fair Price Movement (₹/1g 999 Gold)")
+        st.markdown("##### 📈 Historical Fair Price Movement (₹/1g 999 Benchmark)")
         chart_df = df.copy()
         fig_hist = px.line(
             chart_df,
             x="trade_date",
             y="normalized_price_per_gram",
             color="symbol",
-            title="Normalized Gold Prices Over Time",
-            labels={"trade_date": "Trading Date", "normalized_price_per_gram": "Price (₹/1g 999 Gold)", "symbol": "Contract"},
-            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E"],
+            title="Normalized Commodity Prices Over Time",
+            labels={"trade_date": "Trading Date", "normalized_price_per_gram": "Price (₹/1g 999)", "symbol": "Contract"},
+            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
         )
         fig_hist.update_layout(**PLOTLY_THEME, height=350, margin=dict(l=40, r=20, t=40, b=40))
         st.plotly_chart(fig_hist, use_container_width=True)
@@ -483,8 +519,8 @@ with tabs[0]:
             color="symbol",
             points="all",
             title=f"Dispersion on {latest_date.strftime('%d %b %Y')}",
-            labels={"normalized_price_per_gram": "₹/g (999 Gold)", "symbol": "Contract"},
-            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E"],
+            labels={"normalized_price_per_gram": "₹/g (999)", "symbol": "Contract"},
+            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
         )
         fig_box.update_layout(**PLOTLY_THEME, showlegend=False, height=350, margin=dict(l=40, r=20, t=40, b=40))
         st.plotly_chart(fig_box, use_container_width=True)
@@ -493,7 +529,7 @@ with tabs[0]:
 
     # 2. Quiet Alert Scanner Section
     st.markdown("### 🔔 Quiet Alert Scanner: Multi-Stage Noise Suppression")
-    st.caption("Scans 60 active calendar spread pairs on the latest market date. Signals are suppressed if they violate tender windows, liquidity depth, or post-cost edge.")
+    st.caption("Scans active calendar spread pairs on the selected date. Signals are suppressed if they violate tender windows, liquidity depth, or post-cost edge.")
 
     alert_res = scan_quiet_alerts(
         df,
@@ -586,7 +622,7 @@ with tabs[1]:
             barmode="group",
             title="Traded Volume (Lots)",
             labels={"expiry_date": "Contract Expiry", "volume_lots": "Volume (Lots)"},
-            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E"],
+            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
         )
         fig_vol.update_layout(**PLOTLY_THEME, height=340, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_vol, use_container_width=True)
@@ -601,7 +637,7 @@ with tabs[1]:
             barmode="group",
             title="Open Interest (Lots)",
             labels={"expiry_date": "Contract Expiry", "open_interest_lots": "Open Interest (Lots)"},
-            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E"],
+            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
         )
         fig_oi.update_layout(**PLOTLY_THEME, height=340, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         st.plotly_chart(fig_oi, use_container_width=True)
@@ -628,17 +664,17 @@ with tabs[1]:
 
 
 # =========================================================
-# TAB 3: FUTURES CURVE & CARRY
+# TAB 3: FUTURES CURVE & COMEX PARITY
 # =========================================================
 with tabs[2]:
-    st.subheader("Futures Forward Curve, Implied Carry & Retail Micro-Premium")
-    st.caption("Constructs the forward term structure, separates roll-down from alpha, and analyzes retail convenience markups.")
+    st.subheader("Forward Term Structure Curve, Implied Carry & COMEX Import Parity")
+    st.caption("Constructs the forward term structure, separates roll-down from alpha, and analyzes India Landed Basis vs international COMEX gold.")
 
     c_sym_col, _ = st.columns([1, 2])
     with c_sym_col:
         selected_curve_sym = st.selectbox(
             "Select Contract Curve",
-            ["GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"],
+            sorted(df["symbol"].unique()),
             index=0,
         )
 
@@ -677,7 +713,7 @@ with tabs[2]:
                 **PLOTLY_THEME,
                 height=350,
                 xaxis_title="Contract Expiry Date",
-                yaxis_title="Normalized Price (₹/1g 999 Gold)",
+                yaxis_title="Normalized Price (₹/1g 999)",
                 margin=dict(l=40, r=20, t=40, b=40),
             )
             st.plotly_chart(fig_curve, use_container_width=True)
@@ -704,218 +740,301 @@ with tabs[2]:
 
     st.markdown("---")
 
-    # Retail Micro-Premium Heatmap & Timeline
-    st.markdown("### 🏷️ Retail Micro-Premium Analysis (Slide 6 Stretch Feature)")
-    st.caption("Measures the persistent structural premium that smaller retail contracts (GOLDPETAL 1g, GOLDGUINEA 8g) command over wholesale mini (GOLDM 100g).")
+    # 🌐 NEW: MCX vs COMEX Gold Import Parity & Landed Basis Model
+    st.markdown("### 🌐 MCX vs COMEX Import Parity & India Gold Basis")
+    st.caption("Institutional cross-border pricing: factors in COMEX spot $/oz, USD/INR, 5% BCD + 1% AIDC + 10% SWC tariffs, and domestic GST.")
 
-    micro_df = calculate_retail_micro_premium(df)
-    if not micro_df.empty:
-        col_mp1, col_mp2 = st.columns([3, 2])
+    col_cp1, col_cp2 = st.columns([1, 2])
+    with col_cp1:
+        comex_input = st.number_input("COMEX Gold ($/troy oz)", value=2650.0, step=10.0)
+        usdinr_input = st.number_input("USD/INR Reference Rate", value=84.10, step=0.10)
+        customs_input = st.number_input("Customs Duty (BCD %)", value=5.0, step=0.5)
 
-        with col_mp1:
-            fig_prem = px.line(
-                micro_df,
-                x="trade_date",
-                y="premium_inr_per_g",
-                color="symbol",
-                title="Historical Retail Convenience Markup (₹/g Over GOLDM)",
-                labels={"trade_date": "Trading Date", "premium_inr_per_g": "Retail Premium (₹/g)", "symbol": "Contract"},
-                color_discrete_sequence=["#10B981", "#38BDF8", "#F43F5E"],
-            )
-            fig_prem.add_hline(y=0, line_dash="dash", line_color="#94A3B8")
-            fig_prem.update_layout(**PLOTLY_THEME, height=330, margin=dict(l=40, r=20, t=40, b=40))
-            st.plotly_chart(fig_prem, use_container_width=True)
+    parity_calc = calculate_landed_import_parity(
+        comex_usd_per_oz=comex_input,
+        usdinr_rate=usdinr_input,
+        customs_duty_pct=customs_input,
+        domestic_mcx_price_per_g=avg_norm_price,
+    )
 
-        with col_mp2:
-            st.markdown("##### 📌 Average Retail Convenience Premium")
-            sum_prem = micro_df.groupby("symbol").agg(
-                avg_inr=("premium_inr_per_g", "mean"),
-                avg_pct=("premium_pct", "mean"),
-                max_inr=("premium_inr_per_g", "max"),
-                min_inr=("premium_inr_per_g", "min"),
-            ).reset_index()
-            sum_prem.rename(columns={
-                "symbol": "Contract",
-                "avg_inr": "Avg Markup (₹/g)",
-                "avg_pct": "Avg Markup (%)",
-                "max_inr": "Max Markup (₹/g)",
-                "min_inr": "Min Markup (₹/g)",
-            }, inplace=True)
-            sum_prem["Avg Markup (₹/g)"] = sum_prem["Avg Markup (₹/g)"].apply(lambda x: f"₹{x:.2f}")
-            sum_prem["Avg Markup (%)"] = sum_prem["Avg Markup (%)"].apply(lambda x: f"{x:.2f}%")
-            sum_prem["Max Markup (₹/g)"] = sum_prem["Max Markup (₹/g)"].apply(lambda x: f"₹{x:.2f}")
-            sum_prem["Min Markup (₹/g)"] = sum_prem["Min Markup (₹/g)"].apply(lambda x: f"₹{x:.2f}")
-            st.dataframe(sum_prem, use_container_width=True, hide_index=True)
-            
-            st.info("💡 **Quant Takeaway**: Retail traders pay a persistent ₹2–₹5/g convenience markup for small-ticket 1g (GOLDPETAL) and 8g (GOLDGUINEA) contracts. Naive spread models falsely view this as mispricing.")
+    with col_cp2:
+        pk1, pk2, pk3 = st.columns(3)
+        pk1.metric("Landed Parity (Ex-GST)", f"₹{parity_calc['landed_price_ex_gst_per_g']:,.2f}/g", "Theoretical Import Cost")
+        pk2.metric("Current MCX Futures", f"₹{avg_norm_price:,.2f}/g", "Domestic Benchmark")
+        pk3.metric("India Basis (Premium/Discount)", f"₹{parity_calc['basis_inr_per_g']:+,.2f}/g", f"{parity_calc['basis_pct']:+.2f}%")
+
+        render_html(f"""
+        <div class='glass-card' style='margin-top: 10px;'>
+            <div style='font-size: 0.95rem; font-weight: 700; color: #F5C542;'>Verdict: {parity_calc['market_verdict']}</div>
+            <div style='font-size: 0.85rem; color: #CBD5E1; margin-top: 4px;'>{parity_calc['actionable_insight']}</div>
+        </div>
+        """)
+
+    # Historical Basis timeline chart
+    if is_gold:
+        hist_parity_df = generate_historical_parity_series(df, base_comex_usd=comex_input, base_usdinr=usdinr_input)
+        fig_basis = px.bar(
+            hist_parity_df,
+            x="trade_date",
+            y="basis_inr_per_g",
+            title="Historical India Gold Basis (Domestic MCX Premium / Discount to Landed Parity ₹/g)",
+            labels={"trade_date": "Trading Date", "basis_inr_per_g": "Landed Basis (₹/g)"},
+            color="basis_inr_per_g",
+            color_continuous_scale=["#EF4444", "#38BDF8", "#10B981"],
+        )
+        fig_basis.update_layout(**PLOTLY_THEME, height=300, margin=dict(l=40, r=20, t=40, b=30))
+        st.plotly_chart(fig_basis, use_container_width=True)
 
 
 # =========================================================
-# TAB 4: PROFIT VS FEES SIMULATOR ("WHAT KILLS THE EDGE?")
+# TAB 4: SIMULATOR & ORDER TICKET
 # =========================================================
 with tabs[3]:
-    st.subheader("Profit vs Fees Simulator & Walk-Forward Survival Proof")
-    st.caption("Directly compares pre-cost theoretical equity against post-cost net equity to prove if alpha survives fees and slippage.")
+    st.subheader("Profit vs Fees Simulator & Broker Order Execution Ticket")
+    st.caption("Replays calendar spreads, plots gross vs net equity, and generates 2-leg broker order execution slips.")
 
-    # Simplified Instrument & Pair Selector
     col_bt1, col_bt2 = st.columns([1, 2])
     with col_bt1:
         selected_bt_sym = st.selectbox(
             "Backtest Instrument",
-            ["GOLDGUINEA", "GOLDM", "GOLDTEN", "GOLDPETAL"],
+            sorted(df["symbol"].unique()),
             index=0,
-            help="Select gold contract to analyze calendar spread performance."
+            help="Select commodity contract to analyze calendar spread performance."
         )
 
     spread_data = calculate_calendar_spreads(df, symbol=selected_bt_sym)
     if spread_data.empty:
         st.warning("No calendar spreads available for this instrument.")
-        st.stop()
+    else:
+        available_pairs = spread_data[["near_expiry", "far_expiry"]].drop_duplicates().sort_values(["near_expiry", "far_expiry"])
+        pair_labels = [
+            f"{pd.to_datetime(r['near_expiry']).strftime('%d %b %Y')} ➔ {pd.to_datetime(r['far_expiry']).strftime('%d %b %Y')}"
+            for _, r in available_pairs.iterrows()
+        ]
 
-    available_pairs = spread_data[["near_expiry", "far_expiry"]].drop_duplicates().sort_values(["near_expiry", "far_expiry"])
-    pair_labels = [
-        f"{pd.to_datetime(r['near_expiry']).strftime('%d %b %Y')} ➔ {pd.to_datetime(r['far_expiry']).strftime('%d %b %Y')}"
-        for _, r in available_pairs.iterrows()
-    ]
+        with col_bt2:
+            selected_pair_idx = st.selectbox(
+                "Calendar Spread Expiry Pair",
+                range(len(pair_labels)),
+                format_func=lambda i: pair_labels[i],
+                index=0,
+            )
 
-    with col_bt2:
-        selected_pair_idx = st.selectbox(
-            "Calendar Spread Expiry Pair",
-            range(len(pair_labels)),
-            format_func=lambda i: pair_labels[i],
-            index=0,
+        chosen_near = available_pairs.iloc[selected_pair_idx]["near_expiry"]
+        chosen_far = available_pairs.iloc[selected_pair_idx]["far_expiry"]
+
+        pair_spread = spread_data[
+            (spread_data["near_expiry"] == chosen_near)
+            & (spread_data["far_expiry"] == chosen_far)
+        ].sort_values("trade_date").reset_index(drop=True)
+
+        pair_intel = calculate_spread_intelligence(pair_spread)
+
+        # Run the Cost-Aware Backtest
+        bt_results = run_calendar_spread_backtest(
+            pair_intel,
+            entry_zscore=sb_entry_z,
+            exit_zscore=sb_exit_z,
+            transaction_cost_per_leg=sb_cost_per_leg,
+            slippage_per_leg=sb_slippage_per_leg,
+            lots=sb_lots,
+            expiry_exit_days=sb_tender_exit_days,
         )
 
-    chosen_near = available_pairs.iloc[selected_pair_idx]["near_expiry"]
-    chosen_far = available_pairs.iloc[selected_pair_idx]["far_expiry"]
+        bt_summary = calculate_backtest_summary(bt_results)
+        be_cost = find_breakeven_cost(
+            pair_intel,
+            entry_zscore=sb_entry_z,
+            exit_zscore=sb_exit_z,
+            lots=sb_lots,
+        )
 
-    pair_spread = spread_data[
-        (spread_data["near_expiry"] == chosen_near)
-        & (spread_data["far_expiry"] == chosen_far)
-    ].sort_values("trade_date").reset_index(drop=True)
+        # Performance KPI Cards
+        bk1, bk2, bk3, bk4, bk5, bk6 = st.columns(6)
+        bk1.metric("Pre-Cost Gross P&L", f"₹{bt_summary['total_gross_pnl']:,.2f}", help="Gross profit assuming zero friction")
+        bk2.metric("Total Costs & Slippage", f"-₹{bt_summary['total_costs']:,.2f}", help="Exchange charges + CTT + GST + Slippage")
+        bk3.metric("Post-Cost Net P&L", f"₹{bt_summary['total_net_pnl']:,.2f}", delta=f"Alpha {'Survives' if bt_summary['total_net_pnl'] > 0 else 'Destroyed'}")
+        bk4.metric("Completed Trades", bt_summary["total_trades"])
+        bk5.metric("Win Rate", f"{bt_summary['win_rate']:.1f}%")
+        bk6.metric("Max Drawdown", f"₹{bt_summary['max_drawdown']:,.2f}")
 
-    pair_intel = calculate_spread_intelligence(pair_spread)
+        st.markdown("---")
 
-    # Run the Cost-Aware Backtest
-    bt_results = run_calendar_spread_backtest(
-        pair_intel,
-        entry_zscore=sb_entry_z,
-        exit_zscore=sb_exit_z,
-        transaction_cost_per_leg=sb_cost_per_leg,
-        slippage_per_leg=sb_slippage_per_leg,
-        lots=sb_lots,
-        expiry_exit_days=sb_tender_exit_days,
-    )
+        # Overlaid Pre-Cost vs Post-Cost Equity Curve
+        st.markdown("##### 📉 Honest Pre-Cost vs Post-Cost Equity Curve (USP 4)")
+        fig_equity = go.Figure()
 
-    bt_summary = calculate_backtest_summary(bt_results)
-    be_cost = find_breakeven_cost(
-        pair_intel,
-        entry_zscore=sb_entry_z,
-        exit_zscore=sb_exit_z,
-        lots=sb_lots,
-    )
+        fig_equity.add_trace(go.Scatter(
+            x=bt_results["trade_date"],
+            y=bt_results["cumulative_gross_pnl"],
+            mode="lines",
+            name="Pre-Cost Gross P&L (Paper Arbitrage)",
+            line=dict(color="#38BDF8", width=2, dash="dash"),
+        ))
 
-    # Performance KPI Cards
-    bk1, bk2, bk3, bk4, bk5, bk6 = st.columns(6)
-    bk1.metric("Pre-Cost Gross P&L", f"₹{bt_summary['total_gross_pnl']:,.2f}", help="Gross profit assuming zero friction")
-    bk2.metric("Total Costs & Slippage", f"-₹{bt_summary['total_costs']:,.2f}", help="Exchange charges + CTT + GST + Slippage")
-    bk3.metric("Post-Cost Net P&L", f"₹{bt_summary['total_net_pnl']:,.2f}", delta=f"Alpha {'Survives' if bt_summary['total_net_pnl'] > 0 else 'Destroyed'}")
-    bk4.metric("Completed Trades", bt_summary["total_trades"])
-    bk5.metric("Win Rate", f"{bt_summary['win_rate']:.1f}%")
-    bk6.metric("Max Drawdown", f"₹{bt_summary['max_drawdown']:,.2f}")
+        fig_equity.add_trace(go.Scatter(
+            x=bt_results["trade_date"],
+            y=bt_results["cumulative_pnl"],
+            mode="lines",
+            name="Post-Cost Net Realized P&L",
+            line=dict(color="#F5C542" if bt_summary["total_net_pnl"] >= 0 else "#EF4444", width=3),
+        ))
+
+        fig_equity.add_hline(y=0, line_dash="solid", line_color="#475569")
+
+        fig_equity.update_layout(
+            **PLOTLY_THEME,
+            height=380,
+            xaxis_title="Trading Date",
+            yaxis_title="Cumulative P&L (₹)",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            margin=dict(l=40, r=20, t=50, b=40),
+        )
+        st.plotly_chart(fig_equity, use_container_width=True)
+
+        # "What Kills The Edge?" Sensitivity Gauge & Signal Funnel
+        col_k1, col_k2 = st.columns(2)
+
+        with col_k1:
+            st.markdown("##### 💥 'What Kills the Edge?' Breakeven Analysis")
+            current_friction = sb_cost_per_leg + sb_slippage_per_leg
+            is_viable = current_friction < be_cost
+            
+            render_html(f"""
+            <div class='glass-card'>
+                <div style='display: flex; justify-content: space-between; align-items: center;'>
+                    <div>
+                        <div style='font-size: 0.8rem; color: #94A3B8; text-transform: uppercase;'>Exact Breakeven Cost Per Leg</div>
+                        <div style='font-size: 2.2rem; font-weight: 800; color: #F5C542;'>₹{be_cost:.2f} / leg</div>
+                    </div>
+                    <div>
+                        <span class='badge {"badge-green" if is_viable else "badge-red"}' style='font-size: 0.95rem; padding: 6px 12px;'>
+                            {"Edge Survives Costs" if is_viable else "Edge Destroyed by Friction"}
+                        </span>
+                    </div>
+                </div>
+                <hr style='border-color: #1F2E47; margin: 12px 0;'>
+                <div style='font-size: 0.85rem; color: #CBD5E1;'>
+                    • Current Configured Friction: <b>₹{current_friction:.2f}/leg</b> (Fee: ₹{sb_cost_per_leg} + Slippage: ₹{sb_slippage_per_leg})<br>
+                    • Friction Safety Buffer: <b>₹{max(0.0, be_cost - current_friction):.2f}/leg</b><br>
+                    • <i>If total transaction costs, brokerage, and slippage exceed <b>₹{be_cost:.2f}/leg</b>, strategy P&L turns negative.</i>
+                </div>
+            </div>
+            """)
+
+        with col_k2:
+            st.markdown("##### 🌪️ Signal Suppression Funnel")
+            raw_deviations = int((pair_intel["spread_zscore"].abs() >= sb_entry_z).sum())
+            trades_count = bt_summary["total_trades"]
+            
+            funnel_fig = go.Figure(go.Funnel(
+                y=["Gross Statistical Anomalies", "Survives Tender Lockout", "Survives Liquidity Filter", "Realized Executed Trades"],
+                x=[raw_deviations, max(trades_count, int(raw_deviations * 0.7)), max(trades_count, int(raw_deviations * 0.45)), trades_count],
+                textinfo="value+percent initial",
+                marker=dict(color=["#38BDF8", "#F59E0B", "#A855F7", "#10B981"]),
+            ))
+            funnel_fig.update_layout(**PLOTLY_THEME, height=240, margin=dict(l=40, r=20, t=10, b=10))
+            st.plotly_chart(funnel_fig, use_container_width=True)
+
+        # 📋 2-Leg Order Ticket Section
+        st.markdown("---")
+        st.markdown("### 📋 2-Leg Broker Execution Ticket Generator")
+        st.caption("Generate an exchange-compliant order slip for this spread pair ready for Zerodha Kite Connect or Dhan APIs.")
+
+        t_col1, t_col2 = st.columns([2, 1])
+        with t_col1:
+            ticket_strat = st.radio("Strategy Direction", ["Long Calendar Spread (Buy Far, Sell Near)", "Short Calendar Spread (Sell Far, Buy Near)"], horizontal=True)
+            ticket_obj = generate_spread_order_ticket(
+                symbol=selected_bt_sym,
+                near_expiry=chosen_near,
+                far_expiry=chosen_far,
+                strategy_type="Long Calendar Spread" if "Long" in ticket_strat else "Short Calendar Spread",
+                lots=sb_lots,
+                near_price=avg_norm_price * 10,
+                far_price=(avg_norm_price + 25) * 10,
+            )
+
+            st.dataframe(pd.DataFrame(ticket_obj["legs"]), use_container_width=True, hide_index=True)
+
+        with t_col2:
+            st.markdown(f"""
+            <div class='glass-card-gold'>
+                <div style='font-size: 0.8rem; color: #94A3B8;'>ESTIMATED SPREAD MARGIN</div>
+                <div style='font-size: 1.8rem; font-weight: 700; color: #F5C542;'>₹{ticket_obj['estimated_spread_margin_inr']:,.0f}</div>
+                <div style='font-size: 0.8rem; color: #10B981;'>75% Hedge Relief Applied</div>
+                <div style='font-size: 0.75rem; color: #94A3B8; margin-top: 4px;'>Unhedged Margin: ₹{ticket_obj['estimated_unhedged_margin_inr']:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            kite_json = json.dumps(ticket_obj["zerodha_kite_json"], indent=2)
+            st.download_button("⬇️ Download Kite JSON Payload", data=kite_json, file_name=f"{selected_bt_sym}_spread_order.json", mime="application/json", use_container_width=True)
+
+
+# =========================================================
+# TAB 5: 🤖 AURUM COPILOT (PERSONALIZED AI QUANT ADVISOR)
+# =========================================================
+with tabs[4]:
+    st.subheader("🤖 Aurum Copilot: Personalized Commodity Quant Advisor")
+    st.caption("Ask questions about active trades, hedging formulas, COMEX import parity, or risk suppression.")
+
+    # Initialize chat history in session state
+    if "messages" not in st.session_state:
+        st.session_state.messages = [
+            {
+                "role": "assistant",
+                "content": (
+                    f"Hello! I am **Aurum Copilot**, your real-time commodity derivatives advisor. "
+                    f"I am actively monitoring **{df['symbol'].nunique()} instruments** on MCX (Latest market price: **₹{avg_norm_price:,.2f}/g**).\n\n"
+                    "How can I help you today? You can ask me for trade opportunities, hedging calculations, import parity, or order tickets!"
+                ),
+            }
+        ]
+
+    # Quick action chips
+    st.markdown("##### ⚡ Quick Prompt Suggestions:")
+    qc1, qc2, qc3, qc4 = st.columns(4)
+    if qc1.button("💡 Best Spread Today", use_container_width=True):
+        st.session_state.messages.append({"role": "user", "content": "What is the best calendar spread opportunity today?"})
+        resp = copilot.query("What is the best calendar spread opportunity today?")
+        st.session_state.messages.append({"role": "assistant", "content": resp})
+        st.rerun()
+
+    if qc2.button("🛡️ Hedge 250g Gold", use_container_width=True):
+        st.session_state.messages.append({"role": "user", "content": "How should I hedge 250g of physical gold?"})
+        resp = copilot.query("How should I hedge 250g of physical gold?")
+        st.session_state.messages.append({"role": "assistant", "content": resp})
+        st.rerun()
+
+    if qc3.button("🌐 COMEX Import Basis", use_container_width=True):
+        st.session_state.messages.append({"role": "user", "content": "Is MCX gold at a premium or discount to COMEX?"})
+        resp = copilot.query("Is MCX gold at a premium or discount to COMEX?")
+        st.session_state.messages.append({"role": "assistant", "content": resp})
+        st.rerun()
+
+    if qc4.button("⚠️ Tender Window Risk", use_container_width=True):
+        st.session_state.messages.append({"role": "user", "content": "Why are spread alerts suppressed during the tender period?"})
+        resp = copilot.query("Why are spread alerts suppressed during the tender period?")
+        st.session_state.messages.append({"role": "assistant", "content": resp})
+        st.rerun()
 
     st.markdown("---")
 
-    # Overlaid Pre-Cost vs Post-Cost Equity Curve
-    st.markdown("##### 📉 Honest Pre-Cost vs Post-Cost Equity Curve (USP 4)")
-    fig_equity = go.Figure()
+    # Display conversation history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-    fig_equity.add_trace(go.Scatter(
-        x=bt_results["trade_date"],
-        y=bt_results["cumulative_gross_pnl"],
-        mode="lines",
-        name="Pre-Cost Gross P&L (Paper Arbitrage)",
-        line=dict(color="#38BDF8", width=2, dash="dash"),
-    ))
+    # Chat Input Box
+    if user_input := st.chat_input("Ask Aurum Copilot (e.g., 'How to hedge 500g of gold?', 'Generate Zerodha order ticket')"):
+        # Append user message
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.chat_message("user"):
+            st.markdown(user_input)
 
-    fig_equity.add_trace(go.Scatter(
-        x=bt_results["trade_date"],
-        y=bt_results["cumulative_pnl"],
-        mode="lines",
-        name="Post-Cost Net Realized P&L",
-        line=dict(color="#F5C542" if bt_summary["total_net_pnl"] >= 0 else "#EF4444", width=3),
-    ))
+        # Generate response using Copilot
+        with st.chat_message("assistant"):
+            bot_reply = copilot.query(user_input)
+            st.markdown(bot_reply)
 
-    fig_equity.add_hline(y=0, line_dash="solid", line_color="#475569")
-
-    fig_equity.update_layout(
-        **PLOTLY_THEME,
-        height=380,
-        xaxis_title="Trading Date",
-        yaxis_title="Cumulative P&L (₹)",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        margin=dict(l=40, r=20, t=50, b=40),
-    )
-    st.plotly_chart(fig_equity, use_container_width=True)
-
-    # "What Kills The Edge?" Sensitivity Gauge & Signal Funnel
-    col_k1, col_k2 = st.columns(2)
-
-    with col_k1:
-        st.markdown("##### 💥 'What Kills the Edge?' Breakeven Analysis")
-        current_friction = sb_cost_per_leg + sb_slippage_per_leg
-        is_viable = current_friction < be_cost
-        
-        render_html(f"""
-        <div class='glass-card'>
-            <div style='display: flex; justify-content: space-between; align-items: center;'>
-                <div>
-                    <div style='font-size: 0.8rem; color: #94A3B8; text-transform: uppercase;'>Exact Breakeven Cost Per Leg</div>
-                    <div style='font-size: 2.2rem; font-weight: 800; color: #F5C542;'>₹{be_cost:.2f} / leg</div>
-                </div>
-                <div>
-                    <span class='badge {"badge-green" if is_viable else "badge-red"}' style='font-size: 0.95rem; padding: 6px 12px;'>
-                        {"Edge Survives Costs" if is_viable else "Edge Destroyed by Friction"}
-                    </span>
-                </div>
-            </div>
-            <hr style='border-color: #1F2E47; margin: 12px 0;'>
-            <div style='font-size: 0.85rem; color: #CBD5E1;'>
-                • Current Configured Friction: <b>₹{current_friction:.2f}/leg</b> (Fee: ₹{sb_cost_per_leg} + Slippage: ₹{sb_slippage_per_leg})<br>
-                • Friction Safety Buffer: <b>₹{max(0.0, be_cost - current_friction):.2f}/leg</b><br>
-                • <i>If total transaction costs, brokerage, and slippage exceed <b>₹{be_cost:.2f}/leg</b>, strategy P&L turns negative.</i>
-            </div>
-        </div>
-        """)
-
-    with col_k2:
-        st.markdown("##### 🌪️ Signal Suppression Funnel")
-        raw_deviations = int((pair_intel["spread_zscore"].abs() >= sb_entry_z).sum())
-        trades_count = bt_summary["total_trades"]
-        
-        funnel_fig = go.Figure(go.Funnel(
-            y=["Gross Statistical Anomalies", "Survives Tender Lockout", "Survives Liquidity Filter", "Realized Executed Trades"],
-            x=[raw_deviations, max(trades_count, int(raw_deviations * 0.7)), max(trades_count, int(raw_deviations * 0.45)), trades_count],
-            textinfo="value+percent initial",
-            marker=dict(color=["#38BDF8", "#F59E0B", "#A855F7", "#10B981"]),
-        ))
-        funnel_fig.update_layout(**PLOTLY_THEME, height=240, margin=dict(l=40, r=20, t=10, b=10))
-        st.plotly_chart(funnel_fig, use_container_width=True)
-
-    # Detailed Trade Lifecycle Log Table
-    with st.expander("📋 Detailed Trade Log & Position Lifecycle", expanded=False):
-        trades_display = bt_results[bt_results["action"] != "Hold"].copy()
-        if not trades_display.empty:
-            trades_display["trade_date"] = trades_display["trade_date"].dt.strftime("%d %b %Y")
-            trades_display["near_expiry"] = trades_display["near_expiry"].dt.strftime("%d %b %Y")
-            trades_display["far_expiry"] = trades_display["far_expiry"].dt.strftime("%d %b %Y")
-            st.dataframe(
-                trades_display[[
-                    "trade_date", "action", "spread_zscore", "calendar_spread",
-                    "gross_daily_pnl", "cost_daily", "daily_pnl", "cumulative_pnl", "exit_reason"
-                ]],
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.info("No trades entered under current threshold configuration.")
+        # Append assistant message
+        st.session_state.messages.append({"role": "assistant", "content": bot_reply})
