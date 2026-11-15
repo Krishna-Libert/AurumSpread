@@ -253,16 +253,18 @@ with st.sidebar:
     df = load_active_dataset(active_data_path)
     
     all_dates = sorted(df["trade_date"].dropna().unique())
-    latest_market_date = all_dates[-1]
+    latest_market_date = all_dates[-1] if all_dates else pd.to_datetime("2026-10-26")
 
     # Dynamic Date Scrubber
     selected_date = st.selectbox(
         "Observation Date (82 Sessions)",
-        options=all_dates[::-1],
+        options=all_dates[::-1] if all_dates else [latest_market_date],
         index=0,
         format_func=lambda d: pd.to_datetime(d).strftime("%d %b %Y"),
         help="Replay any historical trading day to watch forward curves and alerts update dynamically."
     )
+    if not selected_date:
+        selected_date = latest_market_date
 
     latest_date = pd.to_datetime(selected_date)
     latest_data = df[df["trade_date"] == latest_date]
@@ -276,6 +278,8 @@ with st.sidebar:
             default="Balanced",
             help="Quickly populate backtest thresholds based on institutional risk tolerance.",
         )
+        if not preset_choice:
+            preset_choice = "Balanced"
         
         if preset_choice == "Institutional":
             default_entry_z = 2.5
@@ -403,14 +407,17 @@ def dialog_order_ticket():
     
     t_lots = st.number_input("Execution Lots", min_value=1, max_value=50, value=1)
     
+    spec = CONTRACT_SPECS.get(t_sym, {})
+    quote_multiplier = spec.get("quote_unit_grams", 10)
+
     ticket = generate_spread_order_ticket(
         symbol=t_sym,
         near_expiry=latest_date + pd.Timedelta(days=20),
         far_expiry=latest_date + pd.Timedelta(days=50),
         strategy_type=t_strat,
         lots=t_lots,
-        near_price=avg_norm_price * 10,
-        far_price=(avg_norm_price + 35) * 10,
+        near_price=avg_norm_price * quote_multiplier,
+        far_price=(avg_norm_price + 3.5) * quote_multiplier,
     )
 
     render_html(f"""
@@ -469,32 +476,34 @@ for sym in active_symbols:
     sub_df = latest_data[latest_data["symbol"] == sym]
     if not sub_df.empty:
         near_contract = sub_df.sort_values("expiry_date").iloc[0]
-        norm_p = near_contract["normalized_price_per_gram"]
-        raw_p = near_contract["close"]
+        norm_p = near_contract.get("normalized_price_per_gram", 0.0)
+        raw_p = near_contract.get("close", 0.0)
         spec = CONTRACT_SPECS.get(sym, {})
         lot_g = spec.get("lot_size_grams", 10)
         lot_str = f"{lot_g // 1000}kg" if lot_g >= 1000 else f"{lot_g}g"
         
-        if is_gold:
-            val_str = f"₹{norm_p:,.1f}/g"
-        else:
-            val_str = f"₹{norm_p*1000:,.0f}/kg (₹{norm_p:,.1f}/g)"
+        if pd.notna(norm_p) and pd.notna(raw_p):
+            if is_gold:
+                val_str = f"₹{norm_p:,.1f}/g"
+            else:
+                val_str = f"₹{norm_p*1000:,.0f}/kg (₹{norm_p:,.1f}/g)"
 
-        ticker_html_items.append(f"""
-        <div class='ticker-item'>
-            <span class='ticker-name'>{sym}</span>
-            <span style='color: #64748B; font-size: 0.72rem;'>({lot_str})</span>
-            <span class='ticker-price'>{val_str}</span>
-            <span class='ticker-close'>Close: ₹{raw_p:,.0f}</span>
-        </div>
-        """)
+            ticker_html_items.append(f"""
+            <div class='ticker-item'>
+                <span class='ticker-name'>{sym}</span>
+                <span style='color: #64748B; font-size: 0.72rem;'>({lot_str})</span>
+                <span class='ticker-price'>{val_str}</span>
+                <span class='ticker-close'>Close: ₹{raw_p:,.0f}</span>
+            </div>
+            """)
 
-render_html(f"""
-<div class='ticker-bar'>
-    <span style='font-size: 0.75rem; font-weight: 700; color: #94A3B8; text-transform: uppercase;'>MARKET SNAPSHOT:</span>
-    {''.join(ticker_html_items)}
-</div>
-""")
+if ticker_html_items:
+    render_html(f"""
+    <div class='ticker-bar'>
+        <span style='font-size: 0.75rem; font-weight: 700; color: #94A3B8; text-transform: uppercase;'>MARKET SNAPSHOT:</span>
+        {''.join(ticker_html_items)}
+    </div>
+    """)
 
 # ---------------------------------------------------------
 # The 5 Main Trader Dashboard Tabs (Including AI Copilot!)
@@ -508,12 +517,16 @@ tabs = st.tabs([
 ])
 
 # =========================================================
-# TAB 1: FAIR PRICE & QUIET ALERT (DECLUTTERED)
+# TAB 1: FAIR PRICE & QUIET ALERT (DECLUTTERED & ROBUST)
 # =========================================================
 with tabs[0]:
-    # Quiet Alert Scan Result
+    # Quiet Alert Scan Result computed strictly up to the selected observation date
+    df_up_to_selected = df[df["trade_date"] <= latest_date].copy()
+    if df_up_to_selected.empty:
+        df_up_to_selected = df.copy()
+
     alert_res = scan_quiet_alerts(
-        df,
+        df_up_to_selected,
         entry_zscore=sb_entry_z,
         transaction_cost_per_leg=sb_cost_per_leg,
         slippage_per_leg=sb_slippage_per_leg,
@@ -528,12 +541,12 @@ with tabs[0]:
     else:
         k1.metric("Benchmark Price (999)", f"₹{avg_norm_price*1000:,.0f} / kg", f"₹{avg_norm_price:.2f}/g ({df['symbol'].nunique()} Contracts)")
 
-    k2.metric("Pairs Evaluated", alert_res["total_pairs_evaluated"], f"Session {latest_date.strftime('%d %b %Y')}")
+    k2.metric("Pairs Evaluated", alert_res.get("total_pairs_evaluated", 0), f"Session {latest_date.strftime('%d %b %Y')}")
     
-    suppressed_total = alert_res["tender_suppressed_count"] + alert_res["cost_suppressed_count"]
-    k3.metric("Noise Traps Blocked", suppressed_total, f"{alert_res['tender_suppressed_count']} Tender • {alert_res['cost_suppressed_count']} Fees")
+    suppressed_total = alert_res.get("tender_suppressed_count", 0) + alert_res.get("cost_suppressed_count", 0)
+    k3.metric("Noise Traps Blocked", suppressed_total, f"{alert_res.get('tender_suppressed_count', 0)} Tender • {alert_res.get('cost_suppressed_count', 0)} Fees")
     
-    active_alerts = alert_res["active_alerts_count"]
+    active_alerts = alert_res.get("active_alerts_count", 0)
     k4.metric("Executable Quiet Alerts", active_alerts, delta="Alpha Survives Fees" if active_alerts > 0 else "0 False Alarms")
 
     st.markdown("---")
@@ -548,10 +561,12 @@ with tabs[0]:
             options=["📈 Fair Price History", "📊 Contract Dispersion", "⚡ Side-by-Side"],
             default="📈 Fair Price History",
         )
+        if not chart_view:
+            chart_view = "📈 Fair Price History"
 
     if chart_view == "📈 Fair Price History":
         fig_hist = px.line(
-            df,
+            df_up_to_selected,
             x="trade_date",
             y="normalized_price_per_gram",
             color="symbol",
@@ -563,24 +578,27 @@ with tabs[0]:
         st.plotly_chart(fig_hist, use_container_width=True)
 
     elif chart_view == "📊 Contract Dispersion":
-        fig_box = px.box(
-            latest_data,
-            x="symbol",
-            y="normalized_price_per_gram",
-            color="symbol",
-            points="all",
-            title=f"Cross-Contract Price Dispersion on {latest_date.strftime('%d %b %Y')} (₹/g)",
-            labels={"normalized_price_per_gram": "₹/g (999)", "symbol": "Contract"},
-            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
-        )
-        fig_box.update_layout(**PLOTLY_THEME, showlegend=False, height=360, margin=dict(l=40, r=20, t=40, b=30))
-        st.plotly_chart(fig_box, use_container_width=True)
+        if not latest_data.empty:
+            fig_box = px.box(
+                latest_data,
+                x="symbol",
+                y="normalized_price_per_gram",
+                color="symbol",
+                points="all",
+                title=f"Cross-Contract Price Dispersion on {latest_date.strftime('%d %b %Y')} (₹/g)",
+                labels={"normalized_price_per_gram": "₹/g (999)", "symbol": "Contract"},
+                color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
+            )
+            fig_box.update_layout(**PLOTLY_THEME, showlegend=False, height=360, margin=dict(l=40, r=20, t=40, b=30))
+            st.plotly_chart(fig_box, use_container_width=True)
+        else:
+            st.info(f"No contract quotes recorded for {latest_date.strftime('%d %b %Y')}.")
 
     else:  # Side-by-Side
         c_p1, c_p2 = st.columns([3, 2])
         with c_p1:
             fig_hist = px.line(
-                df,
+                df_up_to_selected,
                 x="trade_date",
                 y="normalized_price_per_gram",
                 color="symbol",
@@ -591,18 +609,21 @@ with tabs[0]:
             fig_hist.update_layout(**PLOTLY_THEME, height=320, margin=dict(l=30, r=10, t=35, b=25), showlegend=False)
             st.plotly_chart(fig_hist, use_container_width=True)
         with c_p2:
-            fig_box = px.box(
-                latest_data,
-                x="symbol",
-                y="normalized_price_per_gram",
-                color="symbol",
-                points="all",
-                title="Dispersion (₹/g)",
-                labels={"normalized_price_per_gram": "₹/g", "symbol": "Contract"},
-                color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
-            )
-            fig_box.update_layout(**PLOTLY_THEME, showlegend=False, height=320, margin=dict(l=30, r=10, t=35, b=25))
-            st.plotly_chart(fig_box, use_container_width=True)
+            if not latest_data.empty:
+                fig_box = px.box(
+                    latest_data,
+                    x="symbol",
+                    y="normalized_price_per_gram",
+                    color="symbol",
+                    points="all",
+                    title="Dispersion (₹/g)",
+                    labels={"normalized_price_per_gram": "₹/g", "symbol": "Contract"},
+                    color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
+                )
+                fig_box.update_layout(**PLOTLY_THEME, showlegend=False, height=320, margin=dict(l=30, r=10, t=35, b=25))
+                st.plotly_chart(fig_box, use_container_width=True)
+            else:
+                st.info("No quotes on this session.")
 
     st.markdown("---")
 
@@ -617,8 +638,10 @@ with tabs[0]:
             options=["All Pairs", "Executable Alpha Only", "Tender Lockout", "Fee Traps"],
             default="All Pairs",
         )
+        if not view_filter:
+            view_filter = "All Pairs"
 
-    alerts_df = alert_res["alerts_df"]
+    alerts_df = alert_res.get("alerts_df", pd.DataFrame())
     if not alerts_df.empty:
         if view_filter == "Executable Alpha Only":
             display_alerts = alerts_df[alerts_df["status"].str.contains("Active", na=False)].copy()
@@ -630,21 +653,30 @@ with tabs[0]:
             display_alerts = alerts_df.copy()
 
         if display_alerts.empty:
-            st.info(f"No spread pairs match the '{view_filter}' filter for this date.")
+            st.info(f"No spread pairs match the '{view_filter}' filter for session {latest_date.strftime('%d %b %Y')}.")
         else:
             show_cols = [
                 "symbol", "near_expiry", "far_expiry", "signal_type", "spread_zscore",
                 "calendar_spread_inr", "gross_edge_inr", "round_trip_cost_inr", "net_edge_inr",
                 "volume_lots", "status", "reason"
             ]
-            tbl = display_alerts[show_cols].copy()
+            valid_cols = [c for c in show_cols if c in display_alerts.columns]
+            tbl = display_alerts[valid_cols].copy()
+            
+            # Format numbers safely
+            if "spread_zscore" in tbl.columns:
+                tbl["spread_zscore"] = tbl["spread_zscore"].apply(lambda z: f"{z:+.2f}σ" if pd.notna(z) else "N/A")
+            for c in ["calendar_spread_inr", "gross_edge_inr", "round_trip_cost_inr", "net_edge_inr"]:
+                if c in tbl.columns:
+                    tbl[c] = tbl[c].apply(lambda v: f"₹{v:,.2f}" if pd.notna(v) else "—")
+
             tbl.rename(columns={
                 "symbol": "Symbol",
                 "near_expiry": "Near Expiry",
                 "far_expiry": "Far Expiry",
                 "signal_type": "Signal",
                 "spread_zscore": "Z-Score",
-                "calendar_spread_inr": "Spread (₹/g)",
+                "calendar_spread_inr": "Spread",
                 "gross_edge_inr": "Gross Edge",
                 "round_trip_cost_inr": "Total Cost",
                 "net_edge_inr": "Net Edge",
@@ -653,6 +685,8 @@ with tabs[0]:
                 "reason": "Execution Verdict",
             }, inplace=True)
             st.dataframe(tbl, use_container_width=True, hide_index=True)
+    else:
+        st.info("No calendar spread pairs found for evaluation on this session.")
 
 
 # =========================================================
@@ -665,48 +699,50 @@ with tabs[1]:
     depth_data = calculate_liquidity_depth(df)
     latest_depth = depth_data[depth_data["trade_date"] == latest_date].copy()
 
-    # Liquidity KPI Row
-    tier_counts = latest_depth["liquidity_tier"].value_counts()
-    lk1, lk2, lk3, lk4 = st.columns(4)
-    lk1.metric("Tier 1: High Liquidity", tier_counts.get("Liquid (Tier 1)", 0), "Volume >= 200 lots")
-    lk2.metric("Tier 2: Moderate Liquidity", tier_counts.get("Moderate (Tier 2)", 0), "Volume 30–199 lots")
-    lk3.metric("Tier 3: Thin / Illiquid", tier_counts.get("Illiquid / Thin (Tier 3)", 0), "Slippage Haircut Required")
-    lk4.metric("Tender Delivery Lockout", tier_counts.get("Tender Lockout (High Risk)", 0), "Mandatory Physical Delivery")
+    if not latest_depth.empty:
+        tier_counts = latest_depth["liquidity_tier"].value_counts()
+        lk1, lk2, lk3, lk4 = st.columns(4)
+        lk1.metric("Tier 1: High Liquidity", tier_counts.get("Liquid (Tier 1)", 0), "Volume >= 200 lots")
+        lk2.metric("Tier 2: Moderate Liquidity", tier_counts.get("Moderate (Tier 2)", 0), "Volume 30–199 lots")
+        lk3.metric("Tier 3: Thin / Illiquid", tier_counts.get("Illiquid / Thin (Tier 3)", 0), "Slippage Haircut Required")
+        lk4.metric("Tender Delivery Lockout", tier_counts.get("Tender Lockout (High Risk)", 0), "Mandatory Physical Delivery")
 
-    st.markdown("---")
+        st.markdown("---")
 
-    # Volume & Open Interest Depth Charts
-    col_v1, col_v2 = st.columns(2)
+        latest_depth["expiry_label"] = latest_depth["expiry_date"].dt.strftime("%d %b %Y")
+        col_v1, col_v2 = st.columns(2)
 
-    with col_v1:
-        st.markdown("##### 📦 Volume Concentration by Contract & Expiry")
-        fig_vol = px.bar(
-            latest_depth,
-            x="expiry_date",
-            y="volume_lots",
-            color="symbol",
-            barmode="group",
-            title="Traded Volume (Lots)",
-            labels={"expiry_date": "Contract Expiry", "volume_lots": "Volume (Lots)"},
-            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
-        )
-        fig_vol.update_layout(**PLOTLY_THEME, height=320, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(fig_vol, use_container_width=True)
+        with col_v1:
+            st.markdown("##### 📦 Volume Concentration by Contract & Expiry")
+            fig_vol = px.bar(
+                latest_depth,
+                x="expiry_label",
+                y="volume_lots",
+                color="symbol",
+                barmode="group",
+                title="Traded Volume (Lots)",
+                labels={"expiry_label": "Contract Expiry", "volume_lots": "Volume (Lots)"},
+                color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
+            )
+            fig_vol.update_layout(**PLOTLY_THEME, height=320, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(fig_vol, use_container_width=True)
 
-    with col_v2:
-        st.markdown("##### 🏦 Open Interest Depth (Market Participation)")
-        fig_oi = px.bar(
-            latest_depth,
-            x="expiry_date",
-            y="open_interest_lots",
-            color="symbol",
-            barmode="group",
-            title="Open Interest (Lots)",
-            labels={"expiry_date": "Contract Expiry", "open_interest_lots": "Open Interest (Lots)"},
-            color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
-        )
-        fig_oi.update_layout(**PLOTLY_THEME, height=320, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-        st.plotly_chart(fig_oi, use_container_width=True)
+        with col_v2:
+            st.markdown("##### 🏦 Open Interest Depth (Market Participation)")
+            fig_oi = px.bar(
+                latest_depth,
+                x="expiry_label",
+                y="open_interest_lots",
+                color="symbol",
+                barmode="group",
+                title="Open Interest (Lots)",
+                labels={"expiry_label": "Contract Expiry", "open_interest_lots": "Open Interest (Lots)"},
+                color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
+            )
+            fig_oi.update_layout(**PLOTLY_THEME, height=320, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(fig_oi, use_container_width=True)
+    else:
+        st.info(f"No liquidity depth data available for session {latest_date.strftime('%d %b %Y')}.")
 
     # Tender Warning Callout
     render_html("""
@@ -726,22 +762,25 @@ with tabs[2]:
     st.subheader("Forward Term Structure, Annualized Carry & COMEX Parity")
     st.caption("Separates predictable time-value roll-down from real mispricing and monitors cross-border landed import parity.")
 
+    sorted_curve_syms = sorted(df["symbol"].unique())
     col_s1, col_s2 = st.columns([1, 3])
     with col_s1:
-        selected_curve_sym = st.selectbox("Curve Instrument", sorted(df["symbol"].unique()), index=0)
+        selected_curve_sym = st.selectbox("Curve Instrument", sorted_curve_syms, index=0)
 
     curve_df = calculate_term_structure(df, trade_date=latest_date, symbol=selected_curve_sym)
 
     if not curve_df.empty:
         ck1, ck2, ck3, ck4 = st.columns(4)
-        front_p = curve_df.iloc[0]["normalized_price_per_gram"]
-        far_p = curve_df.iloc[-1]["normalized_price_per_gram"]
+        front_p = float(curve_df.iloc[0]["normalized_price_per_gram"])
+        far_p = float(curve_df.iloc[-1]["normalized_price_per_gram"])
         avg_carry = curve_df["annualized_carry_pct"].replace(0, np.nan).mean()
-        regime = curve_df.iloc[-1]["market_regime"]
+        regime = curve_df.iloc[-1].get("market_regime", "Normal Contango")
+        if not regime or pd.isna(regime):
+            regime = "Normal Contango"
 
         ck1.metric("Front Contract (Anchor)", f"₹{front_p:,.2f}/g")
         ck2.metric("Furthest Expiry Price", f"₹{far_p:,.2f}/g")
-        ck3.metric("Annualized Implied Carry", f"{avg_carry:.2f}% p.a." if pd.notna(avg_carry) else "N/A")
+        ck3.metric("Annualized Implied Carry", f"{avg_carry:.2f}% p.a." if pd.notna(avg_carry) and avg_carry != 0 else "0.00% (Single Expiry)")
         ck4.metric("Forward Market Regime", regime, delta="Normal Contango" if "Contango" in regime else "Backwardation")
 
         st.markdown("---")
@@ -786,9 +825,11 @@ with tabs[2]:
                 "annualized_carry_pct": "Carry (% p.a.)",
                 "market_regime": "Regime",
             }, inplace=True)
-            disp_curve["Carry (% p.a.)"] = disp_curve["Carry (% p.a.)"].apply(lambda x: f"{x:.2f}%")
-            disp_curve["Spread"] = disp_curve["Spread"].apply(lambda x: f"₹{x:,.1f}")
+            disp_curve["Carry (% p.a.)"] = disp_curve["Carry (% p.a.)"].apply(lambda x: f"{x:.2f}%" if pd.notna(x) else "—")
+            disp_curve["Spread"] = disp_curve["Spread"].apply(lambda x: f"₹{x:,.1f}" if pd.notna(x) else "—")
             st.dataframe(disp_curve, use_container_width=True, hide_index=True)
+    else:
+        st.info(f"No active forward contracts found for {selected_curve_sym} on {latest_date.strftime('%d %b %Y')}.")
 
     st.markdown("---")
 
@@ -812,35 +853,43 @@ with tabs[2]:
 
     with col_cp2:
         pk1, pk2, pk3 = st.columns(3)
-        pk1.metric("Landed Parity (Ex-GST)", f"₹{parity_calc['landed_price_ex_gst_per_g']:,.2f}/g", "Theoretical Import Cost")
+        landed_val = parity_calc.get("landed_price_ex_gst_per_g", 0.0)
+        basis_inr = parity_calc.get("basis_inr_per_g")
+        basis_pct = parity_calc.get("basis_pct")
+
+        pk1.metric("Landed Parity (Ex-GST)", f"₹{landed_val:,.2f}/g" if landed_val else "N/A", "Theoretical Import Cost")
         pk2.metric("Current MCX Domestic", f"₹{avg_norm_price:,.2f}/g", "Domestic Benchmark")
-        pk3.metric("India Basis (Premium/Discount)", f"₹{parity_calc['basis_inr_per_g']:+,.2f}/g", f"{parity_calc['basis_pct']:+.2f}%")
+        
+        basis_str = f"₹{basis_inr:+,.2f}/g" if basis_inr is not None else "N/A"
+        delta_str = f"{basis_pct:+.2f}%" if basis_pct is not None else None
+        pk3.metric("India Basis (Premium/Discount)", basis_str, delta=delta_str)
 
         render_html(f"""
         <div class='glass-card' style='margin-top: 10px;'>
-            <div style='font-size: 0.95rem; font-weight: 700; color: #F5C542;'>Verdict: {parity_calc['market_verdict']}</div>
-            <div style='font-size: 0.85rem; color: #CBD5E1; margin-top: 4px;'>{parity_calc['actionable_insight']}</div>
+            <div style='font-size: 0.95rem; font-weight: 700; color: #F5C542;'>Verdict: {parity_calc.get('market_verdict', 'Neutral')}</div>
+            <div style='font-size: 0.85rem; color: #CBD5E1; margin-top: 4px;'>{parity_calc.get('actionable_insight', '')}</div>
         </div>
         """)
 
     # Historical Basis timeline chart (for Gold)
     if is_gold:
         hist_parity_df = generate_historical_parity_series(df, base_comex_usd=comex_input, base_usdinr=usdinr_input)
-        fig_basis = px.bar(
-            hist_parity_df,
-            x="trade_date",
-            y="basis_inr_per_g",
-            title="Historical India Gold Basis (Domestic MCX Premium / Discount to Landed Parity ₹/g)",
-            labels={"trade_date": "Trading Date", "basis_inr_per_g": "Landed Basis (₹/g)"},
-            color="basis_inr_per_g",
-            color_continuous_scale=["#EF4444", "#38BDF8", "#10B981"],
-        )
-        fig_basis.update_layout(**PLOTLY_THEME, height=280, margin=dict(l=40, r=20, t=35, b=25))
-        st.plotly_chart(fig_basis, use_container_width=True)
+        if not hist_parity_df.empty and "basis_inr_per_g" in hist_parity_df.columns:
+            fig_basis = px.bar(
+                hist_parity_df,
+                x="trade_date",
+                y="basis_inr_per_g",
+                title="Historical India Gold Basis (Domestic MCX Premium / Discount to Landed Parity ₹/g)",
+                labels={"trade_date": "Trading Date", "basis_inr_per_g": "Landed Basis (₹/g)"},
+                color="basis_inr_per_g",
+                color_continuous_scale=["#EF4444", "#38BDF8", "#10B981"],
+            )
+            fig_basis.update_layout(**PLOTLY_THEME, height=280, margin=dict(l=40, r=20, t=35, b=25))
+            st.plotly_chart(fig_basis, use_container_width=True)
 
 
 # =========================================================
-# TAB 4: SIMULATOR & ORDER TICKET
+# TAB 4: SIMULATOR & ORDER TICKET (ROBUST CRASH-PROOF)
 # =========================================================
 with tabs[3]:
     st.subheader("Profit vs Fees Simulator & Broker Order Execution Ticket")
@@ -857,24 +906,38 @@ with tabs[3]:
 
     spread_data = calculate_calendar_spreads(df, symbol=selected_bt_sym)
     if spread_data.empty:
-        st.warning("No calendar spreads available for this instrument.")
+        st.warning(f"No calendar spreads available for {selected_bt_sym}.")
     else:
+        # Extract pairs and calculate number of trading sessions for each
         available_pairs = spread_data[["near_expiry", "far_expiry"]].drop_duplicates().sort_values(["near_expiry", "far_expiry"])
-        pair_labels = [
-            f"{pd.to_datetime(r['near_expiry']).strftime('%d %b %Y')} ➔ {pd.to_datetime(r['far_expiry']).strftime('%d %b %Y')}"
-            for _, r in available_pairs.iterrows()
-        ]
+        
+        pair_options = []
+        for _, r in available_pairs.iterrows():
+            sub_pair = spread_data[(spread_data["near_expiry"] == r["near_expiry"]) & (spread_data["far_expiry"] == r["far_expiry"])]
+            n_sessions = len(sub_pair)
+            near_txt = pd.to_datetime(r["near_expiry"]).strftime('%d %b %Y')
+            far_txt = pd.to_datetime(r["far_expiry"]).strftime('%d %b %Y')
+            status_tag = f"✅ {n_sessions} sessions" if n_sessions >= 10 else f"⚠️ {n_sessions} sessions (Short History)"
+            pair_options.append((r["near_expiry"], r["far_expiry"], f"{near_txt} ➔ {far_txt} ({status_tag})", n_sessions))
+
+        # Default to a pair with >= 10 sessions if available
+        default_idx = 0
+        for i, opt in enumerate(pair_options):
+            if opt[3] >= 10:
+                default_idx = i
+                break
 
         with col_bt2:
             selected_pair_idx = st.selectbox(
                 "Calendar Spread Expiry Pair",
-                range(len(pair_labels)),
-                format_func=lambda i: pair_labels[i],
-                index=0,
+                range(len(pair_options)),
+                format_func=lambda i: pair_options[i][2],
+                index=default_idx,
             )
 
-        chosen_near = available_pairs.iloc[selected_pair_idx]["near_expiry"]
-        chosen_far = available_pairs.iloc[selected_pair_idx]["far_expiry"]
+        chosen_near = pair_options[selected_pair_idx][0]
+        chosen_far = pair_options[selected_pair_idx][1]
+        pair_n_sessions = pair_options[selected_pair_idx][3]
 
         pair_spread = spread_data[
             (spread_data["near_expiry"] == chosen_near)
@@ -882,117 +945,136 @@ with tabs[3]:
         ].sort_values("trade_date").reset_index(drop=True)
 
         pair_intel = calculate_spread_intelligence(pair_spread)
+        valid_z_count = int(pair_intel["spread_zscore"].dropna().count()) if "spread_zscore" in pair_intel.columns else 0
 
-        # Run the Cost-Aware Backtest
-        bt_results = run_calendar_spread_backtest(
-            pair_intel,
-            entry_zscore=sb_entry_z,
-            exit_zscore=sb_exit_z,
-            transaction_cost_per_leg=sb_cost_per_leg,
-            slippage_per_leg=sb_slippage_per_leg,
-            lots=sb_lots,
-            expiry_exit_days=sb_tender_exit_days,
-        )
+        # Run Backtest safely only if valid observations exist
+        if valid_z_count >= 2:
+            try:
+                bt_results = run_calendar_spread_backtest(
+                    pair_intel,
+                    entry_zscore=sb_entry_z,
+                    exit_zscore=sb_exit_z,
+                    transaction_cost_per_leg=sb_cost_per_leg,
+                    slippage_per_leg=sb_slippage_per_leg,
+                    lots=sb_lots,
+                    expiry_exit_days=sb_tender_exit_days,
+                )
 
-        bt_summary = calculate_backtest_summary(bt_results)
-        be_cost = find_breakeven_cost(
-            pair_intel,
-            entry_zscore=sb_entry_z,
-            exit_zscore=sb_exit_z,
-            lots=sb_lots,
-        )
+                bt_summary = calculate_backtest_summary(bt_results)
+                be_cost = find_breakeven_cost(
+                    pair_intel,
+                    entry_zscore=sb_entry_z,
+                    exit_zscore=sb_exit_z,
+                    lots=sb_lots,
+                )
 
-        # Performance KPI Cards
-        bk1, bk2, bk3, bk4, bk5, bk6 = st.columns(6)
-        bk1.metric("Pre-Cost Gross P&L", f"₹{bt_summary['total_gross_pnl']:,.2f}", help="Gross profit assuming zero friction")
-        bk2.metric("Total Costs & Slippage", f"-₹{bt_summary['total_costs']:,.2f}", help="Exchange charges + CTT + GST + Slippage")
-        bk3.metric("Post-Cost Net P&L", f"₹{bt_summary['total_net_pnl']:,.2f}", delta=f"Alpha {'Survives' if bt_summary['total_net_pnl'] > 0 else 'Destroyed'}")
-        bk4.metric("Completed Trades", bt_summary["total_trades"])
-        bk5.metric("Win Rate", f"{bt_summary['win_rate']:.1f}%")
-        bk6.metric("Max Drawdown", f"₹{bt_summary['max_drawdown']:,.2f}")
+                # Performance KPI Cards
+                bk1, bk2, bk3, bk4, bk5, bk6 = st.columns(6)
+                bk1.metric("Pre-Cost Gross P&L", f"₹{bt_summary['total_gross_pnl']:,.2f}", help="Gross profit assuming zero friction")
+                bk2.metric("Total Costs & Slippage", f"-₹{bt_summary['total_costs']:,.2f}", help="Exchange charges + CTT + GST + Slippage")
+                bk3.metric("Post-Cost Net P&L", f"₹{bt_summary['total_net_pnl']:,.2f}", delta=f"Alpha {'Survives' if bt_summary['total_net_pnl'] > 0 else 'Destroyed'}")
+                bk4.metric("Completed Trades", bt_summary["total_trades"])
+                bk5.metric("Win Rate", f"{bt_summary['win_rate']:.1f}%")
+                bk6.metric("Max Drawdown", f"₹{bt_summary['max_drawdown']:,.2f}")
 
-        st.markdown("---")
+                st.markdown("---")
 
-        # Overlaid Pre-Cost vs Post-Cost Equity Curve
-        st.markdown("##### 📉 Honest Pre-Cost vs Post-Cost Equity Curve (USP 4)")
-        fig_equity = go.Figure()
+                # Overlaid Pre-Cost vs Post-Cost Equity Curve
+                st.markdown("##### 📉 Honest Pre-Cost vs Post-Cost Equity Curve (USP 4)")
+                fig_equity = go.Figure()
 
-        fig_equity.add_trace(go.Scatter(
-            x=bt_results["trade_date"],
-            y=bt_results["cumulative_gross_pnl"],
-            mode="lines",
-            name="Pre-Cost Gross P&L (Paper Arbitrage)",
-            line=dict(color="#38BDF8", width=2, dash="dash"),
-        ))
+                fig_equity.add_trace(go.Scatter(
+                    x=bt_results["trade_date"],
+                    y=bt_results["cumulative_gross_pnl"],
+                    mode="lines",
+                    name="Pre-Cost Gross P&L (Paper Arbitrage)",
+                    line=dict(color="#38BDF8", width=2, dash="dash"),
+                ))
 
-        fig_equity.add_trace(go.Scatter(
-            x=bt_results["trade_date"],
-            y=bt_results["cumulative_pnl"],
-            mode="lines",
-            name="Post-Cost Net Realized P&L",
-            line=dict(color="#F5C542" if bt_summary["total_net_pnl"] >= 0 else "#EF4444", width=3),
-        ))
+                fig_equity.add_trace(go.Scatter(
+                    x=bt_results["trade_date"],
+                    y=bt_results["cumulative_pnl"],
+                    mode="lines",
+                    name="Post-Cost Net Realized P&L",
+                    line=dict(color="#F5C542" if bt_summary["total_net_pnl"] >= 0 else "#EF4444", width=3),
+                ))
 
-        fig_equity.add_hline(y=0, line_dash="solid", line_color="#475569")
+                fig_equity.add_hline(y=0, line_dash="solid", line_color="#475569")
 
-        fig_equity.update_layout(
-            **PLOTLY_THEME,
-            height=340,
-            xaxis_title="Trading Date",
-            yaxis_title="Cumulative P&L (₹)",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-            margin=dict(l=40, r=20, t=40, b=30),
-        )
-        st.plotly_chart(fig_equity, use_container_width=True)
+                fig_equity.update_layout(
+                    **PLOTLY_THEME,
+                    height=340,
+                    xaxis_title="Trading Date",
+                    yaxis_title="Cumulative P&L (₹)",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    margin=dict(l=40, r=20, t=40, b=30),
+                )
+                st.plotly_chart(fig_equity, use_container_width=True)
 
-        # "What Kills The Edge?" Sensitivity Gauge & Signal Funnel
-        col_k1, col_k2 = st.columns(2)
+                # "What Kills The Edge?" Sensitivity Gauge & Signal Funnel
+                col_k1, col_k2 = st.columns(2)
 
-        with col_k1:
-            st.markdown("##### 💥 'What Kills the Edge?' Breakeven Analysis")
-            current_friction = sb_cost_per_leg + sb_slippage_per_leg
-            is_viable = current_friction < be_cost
-            
-            render_html(f"""
-            <div class='glass-card'>
-                <div style='display: flex; justify-content: space-between; align-items: center;'>
-                    <div>
-                        <div style='font-size: 0.8rem; color: #94A3B8; text-transform: uppercase;'>Exact Breakeven Cost Per Leg</div>
-                        <div style='font-size: 2.2rem; font-weight: 800; color: #F5C542;'>₹{be_cost:.2f} / leg</div>
+                with col_k1:
+                    st.markdown("##### 💥 'What Kills the Edge?' Breakeven Analysis")
+                    current_friction = sb_cost_per_leg + sb_slippage_per_leg
+                    is_viable = current_friction < be_cost
+                    
+                    render_html(f"""
+                    <div class='glass-card'>
+                        <div style='display: flex; justify-content: space-between; align-items: center;'>
+                            <div>
+                                <div style='font-size: 0.8rem; color: #94A3B8; text-transform: uppercase;'>Exact Breakeven Cost Per Leg</div>
+                                <div style='font-size: 2.2rem; font-weight: 800; color: #F5C542;'>₹{be_cost:.2f} / leg</div>
+                            </div>
+                            <div>
+                                <span class='badge {"badge-green" if is_viable else "badge-red"}' style='font-size: 0.95rem; padding: 6px 12px;'>
+                                    {"Edge Survives Costs" if is_viable else "Edge Destroyed by Friction"}
+                                </span>
+                            </div>
+                        </div>
+                        <hr style='border-color: #1F2E47; margin: 10px 0;'>
+                        <div style='font-size: 0.85rem; color: #CBD5E1;'>
+                            • Current Friction: <b>₹{current_friction:.2f}/leg</b> (Fee: ₹{sb_cost_per_leg} + Slippage: ₹{sb_slippage_per_leg})<br>
+                            • Friction Safety Buffer: <b>₹{max(0.0, be_cost - current_friction):.2f}/leg</b><br>
+                            • <i>If total costs exceed <b>₹{be_cost:.2f}/leg</b>, strategy P&L turns negative.</i>
+                        </div>
                     </div>
-                    <div>
-                        <span class='badge {"badge-green" if is_viable else "badge-red"}' style='font-size: 0.95rem; padding: 6px 12px;'>
-                            {"Edge Survives Costs" if is_viable else "Edge Destroyed by Friction"}
-                        </span>
-                    </div>
-                </div>
-                <hr style='border-color: #1F2E47; margin: 10px 0;'>
-                <div style='font-size: 0.85rem; color: #CBD5E1;'>
-                    • Current Friction: <b>₹{current_friction:.2f}/leg</b> (Fee: ₹{sb_cost_per_leg} + Slippage: ₹{sb_slippage_per_leg})<br>
-                    • Friction Safety Buffer: <b>₹{max(0.0, be_cost - current_friction):.2f}/leg</b><br>
-                    • <i>If total costs exceed <b>₹{be_cost:.2f}/leg</b>, strategy P&L turns negative.</i>
-                </div>
-            </div>
-            """)
+                    """)
 
-        with col_k2:
-            st.markdown("##### 🌪️ Signal Suppression Funnel")
-            raw_deviations = int((pair_intel["spread_zscore"].abs() >= sb_entry_z).sum())
-            trades_count = bt_summary["total_trades"]
-            
-            funnel_fig = go.Figure(go.Funnel(
-                y=["Gross Anomalies", "Tender Filter", "Liquidity Filter", "Executed Trades"],
-                x=[raw_deviations, max(trades_count, int(raw_deviations * 0.7)), max(trades_count, int(raw_deviations * 0.45)), trades_count],
-                textinfo="value+percent initial",
-                marker=dict(color=["#38BDF8", "#F59E0B", "#A855F7", "#10B981"]),
-            ))
-            funnel_fig.update_layout(**PLOTLY_THEME, height=220, margin=dict(l=40, r=20, t=10, b=10))
-            st.plotly_chart(funnel_fig, use_container_width=True)
+                with col_k2:
+                    st.markdown("##### 🌪️ Signal Suppression Funnel")
+                    raw_deviations = int((pair_intel["spread_zscore"].abs() >= sb_entry_z).sum())
+                    trades_count = bt_summary["total_trades"]
+                    
+                    funnel_fig = go.Figure(go.Funnel(
+                        y=["Gross Anomalies", "Tender Filter", "Liquidity Filter", "Executed Trades"],
+                        x=[raw_deviations, max(trades_count, int(raw_deviations * 0.7)), max(trades_count, int(raw_deviations * 0.45)), trades_count],
+                        textinfo="value+percent initial",
+                        marker=dict(color=["#38BDF8", "#F59E0B", "#A855F7", "#10B981"]),
+                    ))
+                    funnel_fig.update_layout(**PLOTLY_THEME, height=220, margin=dict(l=40, r=20, t=10, b=10))
+                    st.plotly_chart(funnel_fig, use_container_width=True)
 
-        # 📋 2-Leg Order Ticket Section
+            except Exception as bt_err:
+                st.warning(f"Unable to run backtest simulation on this pair: {bt_err}")
+
+        else:
+            near_date_txt = pd.to_datetime(chosen_near).strftime('%d %b %Y')
+            far_date_txt = pd.to_datetime(chosen_far).strftime('%d %b %Y')
+            st.info(
+                f"ℹ️ **Insufficient Historical Observations ({pair_n_sessions} trading session{'s' if pair_n_sessions > 1 else ''})**\n\n"
+                f"The selected forward pair (**{near_date_txt} ➔ {far_date_txt}**) was quoted for fewer than 10 market sessions, "
+                "which is below the expanding-window sample size needed for statistically sound mean-reversion backtesting.\n\n"
+                "👉 *Please select a near-month pair marked with `✅ (>=10 sessions)` from the dropdown above to view the full walk-forward equity curve.*"
+            )
+
+        # 📋 2-Leg Order Ticket Section (Always Available)
         st.markdown("---")
         st.markdown("### 📋 2-Leg Broker Execution Ticket Generator")
         st.caption("Generate an exchange-compliant order slip for this spread pair ready for Zerodha Kite Connect or Dhan APIs.")
+
+        spec = CONTRACT_SPECS.get(selected_bt_sym, {})
+        quote_multiplier = spec.get("quote_unit_grams", 10)
 
         t_col1, t_col2 = st.columns([2, 1])
         with t_col1:
@@ -1003,8 +1085,8 @@ with tabs[3]:
                 far_expiry=chosen_far,
                 strategy_type="Long Calendar Spread" if "Long" in ticket_strat else "Short Calendar Spread",
                 lots=sb_lots,
-                near_price=avg_norm_price * 10,
-                far_price=(avg_norm_price + 25) * 10,
+                near_price=avg_norm_price * quote_multiplier,
+                far_price=(avg_norm_price + 3.5) * quote_multiplier,
             )
 
             st.dataframe(pd.DataFrame(ticket_obj["legs"]), use_container_width=True, hide_index=True)
