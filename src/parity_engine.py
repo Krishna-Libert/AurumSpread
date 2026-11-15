@@ -1,9 +1,9 @@
-"""MCX vs COMEX Gold & Silver Import Parity Engine.
+"""MCX vs COMEX Gold Import Parity Engine.
 
 Calculates theoretical Indian landed import cost from international benchmark prices
-(COMEX Gold / Silver in USD/oz and USD/INR exchange rate), factoring in Indian tariff
+(COMEX Gold in USD/oz and USD/INR exchange rate), factoring in Indian tariff
 structures (Customs Duty, AIDC, Social Welfare Surcharge, and GST).
-Quantifies the India Gold/Silver Basis (Domestic Premium / Discount).
+Quantifies the India Gold Basis (Domestic Premium / Discount).
 """
 
 from typing import Dict, Any, Optional

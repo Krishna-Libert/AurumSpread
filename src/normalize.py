@@ -1,18 +1,12 @@
-"""MCX Commodity Contract Normalization Engine.
+"""MCX Gold Futures Contract Normalization Engine.
 
-Converts all supported MCX gold and silver futures quotes to INR per 1 gram of 999 purity.
+Converts all supported MCX gold futures quotes to INR per 1 gram of 999 purity.
 Supported Gold Contracts:
   - GOLD:       Close / 10 * (999 / 995)   (quoted per 10g, 995 purity, 1 kg / 1000g lot)
   - GOLDM:      Close / 10 * (999 / 995)   (quoted per 10g, 995 purity, 100g lot)
   - GOLDTEN:    Close / 10                 (quoted per 10g, 999 purity, 10g lot)
   - GOLDGUINEA: Close / 8                  (quoted per 8g, 999 purity, 8g lot)
   - GOLDPETAL:  Close / 1                  (quoted per 1g, 999 purity, 1g lot)
-
-Supported Silver Contracts:
-  - SILVER:     Close / 1000               (quoted per 1 kg, 999 purity, 30 kg lot)
-  - SILVERM:    Close / 1000               (quoted per 1 kg, 999 purity, 5 kg lot)
-  - SILVERMIC:  Close / 1000               (quoted per 1 kg, 999 purity, 1 kg lot)
-  - SILVER100:  Close / 100                (quoted per 100g, 999 purity, 100g lot)
 """
 
 from typing import Dict, Any
@@ -75,52 +69,6 @@ CONTRACT_SPECS: Dict[str, Dict[str, Any]] = {
         "tender_period_days": 5,
         "formula_str": "Close ÷ 1",
     },
-
-    # --- Silver Contracts ---
-    "SILVER": {
-        "commodity": "SILVER",
-        "name": "Silver Big 30Kg",
-        "lot_size_grams": 30000,
-        "quote_unit_grams": 1000,
-        "purity": 999,
-        "purity_factor": 1.0,
-        "expiry_cycle": "5th of expiry month",
-        "tender_period_days": 5,
-        "formula_str": "Close ÷ 1000",
-    },
-    "SILVERM": {
-        "commodity": "SILVER",
-        "name": "Silver Mini 5Kg",
-        "lot_size_grams": 5000,
-        "quote_unit_grams": 1000,
-        "purity": 999,
-        "purity_factor": 1.0,
-        "expiry_cycle": "Last business day",
-        "tender_period_days": 5,
-        "formula_str": "Close ÷ 1000",
-    },
-    "SILVERMIC": {
-        "commodity": "SILVER",
-        "name": "Silver Micro 1Kg",
-        "lot_size_grams": 1000,
-        "quote_unit_grams": 1000,
-        "purity": 999,
-        "purity_factor": 1.0,
-        "expiry_cycle": "Last business day",
-        "tender_period_days": 5,
-        "formula_str": "Close ÷ 1000",
-    },
-    "SILVER100": {
-        "commodity": "SILVER",
-        "name": "Silver 100 Grams",
-        "lot_size_grams": 100,
-        "quote_unit_grams": 10,
-        "purity": 999,
-        "purity_factor": 1.0,
-        "expiry_cycle": "Last business day",
-        "tender_period_days": 5,
-        "formula_str": "Close ÷ 10",
-    },
 }
 
 
@@ -157,12 +105,6 @@ def normalize_gold_prices(df: pd.DataFrame) -> pd.DataFrame:
         "GOLDTEN": lambda price: price / 10.0,
         "GOLDGUINEA": lambda price: price / 8.0,
         "GOLDPETAL": lambda price: price / 1.0,
-
-        # Silver
-        "SILVER": lambda price: price / 1000.0,
-        "SILVERM": lambda price: price / 1000.0,
-        "SILVERMIC": lambda price: price / 1000.0,
-        "SILVER100": lambda price: price / 10.0,
     }
 
     result["normalized_price_per_gram"] = pd.NA

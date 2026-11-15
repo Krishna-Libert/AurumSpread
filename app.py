@@ -40,7 +40,6 @@ from src.order_ticket import generate_spread_order_ticket, export_order_ticket_c
 from src.copilot_engine import AurumCopilot
 
 GOLD_DATA_PATH = Path("data/processed/historical_gold_futures.csv")
-SILVER_DATA_PATH = Path("data/processed/historical_silver_futures.csv")
 
 st.set_page_config(
     page_title="AurumSpread PRO | Commodity Derivatives Intelligence",
@@ -223,23 +222,12 @@ button[data-baseweb="tab"][aria-selected="true"] {
 """)
 
 # ---------------------------------------------------------
-# Sidebar Controls & Commodity Universe Switcher
+# Sidebar Controls & Market Universe
 # ---------------------------------------------------------
 with st.sidebar:
-    st.markdown("### 🌐 Market Universe")
-    
-    # Dynamic Commodity Switcher with safe fallback
-    commodity_choice = st.segmented_control(
-        "Commodity Universe",
-        options=["🟡 Gold Futures", "⚪ Silver Futures"],
-        default="🟡 Gold Futures",
-        help="Switch dynamically between MCX Gold contracts and MCX Silver contracts.",
-    )
-    if not commodity_choice:
-        commodity_choice = "🟡 Gold Futures"
-
-    is_gold = "Gold" in commodity_choice
-    active_data_path = GOLD_DATA_PATH if is_gold else SILVER_DATA_PATH
+    st.markdown("### 🟡 MCX Gold Universe")
+    st.caption("Active Contracts: `GOLD` (1kg) • `GOLDM` (100g) • `GOLDTEN` (10g) • `GOLDGUINEA` (8g) • `GOLDPETAL` (1g)")
+    active_data_path = GOLD_DATA_PATH
 
     @st.cache_data
     def load_active_dataset(file_path: Path) -> pd.DataFrame:
@@ -272,7 +260,7 @@ with st.sidebar:
 
     latest_date = pd.to_datetime(selected_date)
     latest_data = df[df["trade_date"] == latest_date]
-    avg_norm_price = float(latest_data["normalized_price_per_gram"].mean()) if not latest_data.empty else (7500.0 if is_gold else 230.0)
+    avg_norm_price = float(latest_data["normalized_price_per_gram"].mean()) if not latest_data.empty else 7500.0
 
     # 1-Click Strategy Presets
     with st.expander("🎛️ Strategy Presets & Z-Scores", expanded=False):
@@ -452,7 +440,7 @@ col_head1, col_head2 = st.columns([3, 2])
 
 with col_head1:
     st.title("🟡 AurumSpread PRO")
-    st.caption(f"Track 03 • Commodity Derivatives Intelligence | Universe: **{commodity_choice}** • Session: **{latest_date.strftime('%d %b %Y')}**")
+    st.caption(f"Track 03 • Commodity Derivatives Intelligence | MCX Gold Futures • Session: **{latest_date.strftime('%d %b %Y')}**")
 
 with col_head2:
     btn_c1, btn_c2, btn_c3 = st.columns(3)
@@ -480,10 +468,9 @@ if active_symbols:
             lot_str = f"{lot_g // 1000}kg" if lot_g >= 1000 else f"{lot_g}g"
             
             if pd.notna(norm_p) and pd.notna(raw_p):
-                val_str = f"₹{norm_p:,.1f}/g" if is_gold else f"₹{norm_p*1000:,.0f}/kg"
                 col.metric(
                     label=f"{sym} ({lot_str})",
-                    value=val_str,
+                    value=f"₹{norm_p:,.1f}/g",
                     delta=f"Close: ₹{raw_p:,.0f}",
                     delta_color="off",
                 )
@@ -518,12 +505,7 @@ with tabs[0]:
 
     # 1. Executive Metric Strip (4 High-Impact KPIs)
     k1, k2, k3, k4 = st.columns(4)
-    
-    if is_gold:
-        k1.metric("Benchmark Price (999)", f"₹{avg_norm_price:,.2f} / g", f"{df['symbol'].nunique()} Contracts Active")
-    else:
-        k1.metric("Benchmark Price (999)", f"₹{avg_norm_price*1000:,.0f} / kg", f"₹{avg_norm_price:.2f}/g ({df['symbol'].nunique()} Contracts)")
-
+    k1.metric("Benchmark Price (999)", f"₹{avg_norm_price:,.2f} / g", f"{df['symbol'].nunique()} Gold Contracts Active")
     k2.metric("Pairs Evaluated", alert_res.get("total_pairs_evaluated", 0), f"Session {latest_date.strftime('%d %b %Y')}")
     
     suppressed_total = alert_res.get("tender_suppressed_count", 0) + alert_res.get("cost_suppressed_count", 0)
@@ -553,7 +535,7 @@ with tabs[0]:
             x="trade_date",
             y="normalized_price_per_gram",
             color="symbol",
-            title=f"Historical Fair Price Trends ({'₹/1g 999 Gold' if is_gold else '₹/1g 999 Silver'})",
+            title="Historical Fair Price Trends (₹/1g 999 Gold)",
             labels={"trade_date": "Trading Date", "normalized_price_per_gram": "Price (₹/g 999)", "symbol": "Contract"},
             color_discrete_sequence=["#F5C542", "#10B981", "#38BDF8", "#F43F5E", "#A855F7"],
         )
@@ -816,14 +798,13 @@ with tabs[2]:
 
     st.markdown("---")
 
-    # 🌐 MCX vs COMEX Import Parity & Landed Basis Model
-    st.markdown(f"### 🌐 MCX vs COMEX Import Parity & India {'Gold' if is_gold else 'Silver'} Basis")
+    # 🌐 MCX vs COMEX Gold Import Parity & Landed Basis Model
+    st.markdown("### 🌐 MCX vs COMEX Gold Import Parity & Landed Basis")
     st.caption("Institutional cross-border pricing: factors in COMEX spot $/oz, USD/INR, 5% BCD + 1% AIDC + 10% SWC tariffs, and domestic GST.")
 
     col_cp1, col_cp2 = st.columns([1, 2])
     with col_cp1:
-        default_comex = 2650.0 if is_gold else 31.50
-        comex_input = st.number_input(f"COMEX {'Gold' if is_gold else 'Silver'} ($/troy oz)", value=default_comex, step=5.0 if is_gold else 0.5)
+        comex_input = st.number_input("COMEX Gold ($/troy oz)", value=2650.0, step=5.0)
         usdinr_input = st.number_input("USD/INR Reference Rate", value=84.10, step=0.10)
         customs_input = st.number_input("Customs Duty (BCD %)", value=5.0, step=0.5)
 
@@ -854,21 +835,20 @@ with tabs[2]:
         </div>
         """)
 
-    # Historical Basis timeline chart (for Gold)
-    if is_gold:
-        hist_parity_df = generate_historical_parity_series(df, base_comex_usd=comex_input, base_usdinr=usdinr_input)
-        if not hist_parity_df.empty and "basis_inr_per_g" in hist_parity_df.columns:
-            fig_basis = px.bar(
-                hist_parity_df,
-                x="trade_date",
-                y="basis_inr_per_g",
-                title="Historical India Gold Basis (Domestic MCX Premium / Discount to Landed Parity ₹/g)",
-                labels={"trade_date": "Trading Date", "basis_inr_per_g": "Landed Basis (₹/g)"},
-                color="basis_inr_per_g",
-                color_continuous_scale=["#EF4444", "#38BDF8", "#10B981"],
-            )
-            fig_basis.update_layout(**PLOTLY_THEME, height=280, margin=dict(l=40, r=20, t=35, b=25))
-            st.plotly_chart(fig_basis, use_container_width=True)
+    # Historical Basis timeline chart (Gold)
+    hist_parity_df = generate_historical_parity_series(df, base_comex_usd=comex_input, base_usdinr=usdinr_input)
+    if not hist_parity_df.empty and "basis_inr_per_g" in hist_parity_df.columns:
+        fig_basis = px.bar(
+            hist_parity_df,
+            x="trade_date",
+            y="basis_inr_per_g",
+            title="Historical India Gold Basis (Domestic MCX Premium / Discount to Landed Parity ₹/g)",
+            labels={"trade_date": "Trading Date", "basis_inr_per_g": "Landed Basis (₹/g)"},
+            color="basis_inr_per_g",
+            color_continuous_scale=["#EF4444", "#38BDF8", "#10B981"],
+        )
+        fig_basis.update_layout(**PLOTLY_THEME, height=280, margin=dict(l=40, r=20, t=35, b=25))
+        st.plotly_chart(fig_basis, use_container_width=True)
 
 
 # =========================================================

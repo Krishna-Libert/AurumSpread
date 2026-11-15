@@ -17,8 +17,8 @@ from src.copilot_engine import AurumCopilot
 
 def test_normalize_formulas():
     df = pd.DataFrame({
-        "symbol": ["GOLD", "GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL", "SILVER", "SILVERM"],
-        "close": [75000.0, 75000.0, 75000.0, 60000.0, 7500.0, 90000.0, 90000.0],
+        "symbol": ["GOLD", "GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"],
+        "close": [75000.0, 75000.0, 75000.0, 60000.0, 7500.0],
     })
     res = normalize_gold_prices(df)
     
@@ -37,12 +37,6 @@ def test_normalize_formulas():
 
     # GOLDPETAL: 7500 / 1 = 7500
     assert abs(res.loc[4, "normalized_price_per_gram"] - 7500.0) < 1e-4
-
-    # SILVER (30kg): 90000 / 1000 = 90
-    assert abs(res.loc[5, "normalized_price_per_gram"] - 90.0) < 1e-4
-
-    # SILVERM (5kg): 90000 / 1000 = 90
-    assert abs(res.loc[6, "normalized_price_per_gram"] - 90.0) < 1e-4
 
 
 def test_tender_period_detection():
