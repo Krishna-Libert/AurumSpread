@@ -52,7 +52,9 @@ st.set_page_config(
 
 def render_html(html_content: str) -> None:
     """Safely render HTML without accidental markdown code block indentation."""
-    st.markdown(textwrap.dedent(html_content).strip(), unsafe_allow_html=True)
+    cleaned_lines = [line.strip() for line in html_content.strip().splitlines() if line.strip()]
+    cleaned_html = "\n".join(cleaned_lines)
+    st.markdown(cleaned_html, unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------
@@ -488,22 +490,23 @@ for sym in active_symbols:
             else:
                 val_str = f"₹{norm_p*1000:,.0f}/kg (₹{norm_p:,.1f}/g)"
 
-            ticker_html_items.append(f"""
-            <div class='ticker-item'>
-                <span class='ticker-name'>{sym}</span>
-                <span style='color: #64748B; font-size: 0.72rem;'>({lot_str})</span>
-                <span class='ticker-price'>{val_str}</span>
-                <span class='ticker-close'>Close: ₹{raw_p:,.0f}</span>
-            </div>
-            """)
+            ticker_html_items.append(
+                f"<div class='ticker-item'>"
+                f"<span class='ticker-name'>{sym}</span> "
+                f"<span style='color: #64748B; font-size: 0.72rem;'>({lot_str})</span> "
+                f"<span class='ticker-price'>{val_str}</span> "
+                f"<span class='ticker-close'>Close: ₹{raw_p:,.0f}</span>"
+                f"</div>"
+            )
 
 if ticker_html_items:
-    render_html(f"""
-    <div class='ticker-bar'>
-        <span style='font-size: 0.75rem; font-weight: 700; color: #94A3B8; text-transform: uppercase;'>MARKET SNAPSHOT:</span>
-        {''.join(ticker_html_items)}
-    </div>
-    """)
+    joined_items = "".join(ticker_html_items)
+    render_html(
+        f"<div class='ticker-bar'>"
+        f"<span style='font-size: 0.75rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; margin-right: 4px;'>MARKET SNAPSHOT:</span>"
+        f"{joined_items}"
+        f"</div>"
+    )
 
 # ---------------------------------------------------------
 # The 5 Main Trader Dashboard Tabs (Including AI Copilot!)
