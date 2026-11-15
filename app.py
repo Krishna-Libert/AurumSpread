@@ -51,10 +51,12 @@ st.set_page_config(
 
 
 def render_html(html_content: str) -> None:
-    """Safely render HTML without accidental markdown code block indentation."""
-    cleaned_lines = [line.strip() for line in html_content.strip().splitlines() if line.strip()]
-    cleaned_html = "\n".join(cleaned_lines)
-    st.markdown(cleaned_html, unsafe_allow_html=True)
+    """Safely render HTML using native st.html without Markdown parsing."""
+    if hasattr(st, "html"):
+        st.html(html_content)
+    else:
+        cleaned_lines = [line.strip() for line in html_content.strip().splitlines() if line.strip()]
+        st.markdown("\n".join(cleaned_lines), unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------
@@ -449,15 +451,8 @@ def dialog_order_ticket():
 col_head1, col_head2 = st.columns([3, 2])
 
 with col_head1:
-    render_html(f"""
-    <div style='display: flex; align-items: baseline; gap: 10px;'>
-        <h2 style='margin: 0; font-size: 1.8rem; color: #F8FAFC;'>🟡 AurumSpread <span style='font-size: 0.95rem; color: #F5C542; background: rgba(245, 197, 66, 0.12); border: 1px solid rgba(245, 197, 66, 0.35); padding: 2px 8px; border-radius: 6px;'>PRO QUANT</span></h2>
-        <span style='color: #94A3B8; font-size: 0.85rem;'>Track 03 • Commodity Derivatives Intelligence</span>
-    </div>
-    <div style='color: #64748B; font-size: 0.82rem; margin-top: 2px;'>
-        Active Universe: <b style='color: #F1F5F9;'>{commodity_choice}</b> &nbsp;|&nbsp; Session: <b style='color: #F5C542;'>{latest_date.strftime('%d %b %Y')}</b>
-    </div>
-    """)
+    st.title("🟡 AurumSpread PRO")
+    st.caption(f"Track 03 • Commodity Derivatives Intelligence | Universe: **{commodity_choice}** • Session: **{latest_date.strftime('%d %b %Y')}**")
 
 with col_head2:
     btn_c1, btn_c2, btn_c3 = st.columns(3)
@@ -469,44 +464,29 @@ with col_head2:
         dialog_order_ticket()
 
 # ---------------------------------------------------------
-# Sleek Horizontal Market Ticker Ribbon (Ultra-Slim)
+# Sleek Horizontal Market Ticker Ribbon (100% Native Streamlit)
 # ---------------------------------------------------------
 active_symbols = sorted(df["symbol"].unique())
-ticker_html_items = []
-
-for sym in active_symbols:
-    sub_df = latest_data[latest_data["symbol"] == sym]
-    if not sub_df.empty:
-        near_contract = sub_df.sort_values("expiry_date").iloc[0]
-        norm_p = near_contract.get("normalized_price_per_gram", 0.0)
-        raw_p = near_contract.get("close", 0.0)
-        spec = CONTRACT_SPECS.get(sym, {})
-        lot_g = spec.get("lot_size_grams", 10)
-        lot_str = f"{lot_g // 1000}kg" if lot_g >= 1000 else f"{lot_g}g"
-        
-        if pd.notna(norm_p) and pd.notna(raw_p):
-            if is_gold:
-                val_str = f"₹{norm_p:,.1f}/g"
-            else:
-                val_str = f"₹{norm_p*1000:,.0f}/kg (₹{norm_p:,.1f}/g)"
-
-            ticker_html_items.append(
-                f"<div class='ticker-item'>"
-                f"<span class='ticker-name'>{sym}</span> "
-                f"<span style='color: #64748B; font-size: 0.72rem;'>({lot_str})</span> "
-                f"<span class='ticker-price'>{val_str}</span> "
-                f"<span class='ticker-close'>Close: ₹{raw_p:,.0f}</span>"
-                f"</div>"
-            )
-
-if ticker_html_items:
-    joined_items = "".join(ticker_html_items)
-    render_html(
-        f"<div class='ticker-bar'>"
-        f"<span style='font-size: 0.75rem; font-weight: 700; color: #94A3B8; text-transform: uppercase; margin-right: 4px;'>MARKET SNAPSHOT:</span>"
-        f"{joined_items}"
-        f"</div>"
-    )
+if active_symbols:
+    ticker_cols = st.columns(len(active_symbols))
+    for sym, col in zip(active_symbols, ticker_cols):
+        sub_df = latest_data[latest_data["symbol"] == sym]
+        if not sub_df.empty:
+            near_contract = sub_df.sort_values("expiry_date").iloc[0]
+            norm_p = near_contract.get("normalized_price_per_gram", 0.0)
+            raw_p = near_contract.get("close", 0.0)
+            spec = CONTRACT_SPECS.get(sym, {})
+            lot_g = spec.get("lot_size_grams", 10)
+            lot_str = f"{lot_g // 1000}kg" if lot_g >= 1000 else f"{lot_g}g"
+            
+            if pd.notna(norm_p) and pd.notna(raw_p):
+                val_str = f"₹{norm_p:,.1f}/g" if is_gold else f"₹{norm_p*1000:,.0f}/kg"
+                col.metric(
+                    label=f"{sym} ({lot_str})",
+                    value=val_str,
+                    delta=f"Close: ₹{raw_p:,.0f}",
+                    delta_color="off",
+                )
 
 # ---------------------------------------------------------
 # The 5 Main Trader Dashboard Tabs (Including AI Copilot!)
