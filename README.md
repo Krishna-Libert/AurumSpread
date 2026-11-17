@@ -13,7 +13,7 @@
 
 | Team Member | Role | Core Deliverables |
 |---|---|---|
-| **Shivansh Sahni** | Data & Python Backend | MCX Bhavcopy ingestion across 82 market dates, ₹/1g 999 gold normalization, COMEX landed parity model, and the cleaned gold futures database (2,445 rows). |
+| **Shivansh Sahni** | Data & Python Backend | MCX Bhavcopy ingestion across 82 market dates, ₹/1g 999 gold normalization, COMEX landed parity model, and the cleaned gold futures database (1,968 rows). |
 | **Krishna Sharma** | Quant Logic & Backtesting | Day-by-day walk-forward simulator, cost-of-carry decomposition, liquidity penalty, tender lifecycle rules, exchange SPAN margin relief, and Aurum Copilot NLP rule-based engine. |
 | **Dhruv Gupta** | Frontend UI & Outreach | 5-tab institutional Streamlit dashboard, dynamic observation date scrubber, broker ticket export (Kite & Dhan), Plotly analytics, and demo presentation. |
 
@@ -22,7 +22,7 @@
 ## 🎯 Problem Statement & Theme Alignment
 
 In the Indian commodities market on the **Multi Commodity Exchange (MCX)**:
-- **Same Gold, Multiple Contracts**: Lot sizes, quotation bases, purities, and expiry cycles diverge across contracts (`GOLD`, `GOLDM`, `GOLDTEN`, `GOLDGUINEA`, `GOLDPETAL`).
+- **Same Gold, Multiple Contracts**: Lot sizes, quotation bases, purities, and expiry cycles diverge across contracts (`GOLDM`, `GOLDTEN`, `GOLDGUINEA`, `GOLDPETAL`).
 - **Messy MCX Bhavcopy**: Space-padded symbols, mixed date formats (`%d %b %Y` vs `%d%b%Y`), and silent holiday gaps create false signals.
 - **The Arbitrage Mirage**: Apparent calendar spread arbitrage profits vanish once realistic exchange turnover fees, STT/CTT taxes, delivery margins, and thin liquidity haircuts are accounted for.
 - **Continuous Series Rollover Distortion**: Retail terminals (e.g. TradingView continuous contracts) stitch together contracts, introducing artificial price jumps at expiry that corrupt econometric spreads.
@@ -39,7 +39,6 @@ AurumSpread delivers **institutional analytical rigor over daily signals**: prov
    Every contract is tracked as an independent `(Symbol, Expiry)` pair. Eliminates artificial rollover jumps and blocks new entries during illiquid and **MCX physical tender windows** (5 days pre-expiry).
 2. **Unit + Purity + Carry Normalization**  
    Converts all gold contracts to a uniform **₹ per 1 gram of 999 purity gold**:
-   - `GOLD` (1kg): $\text{Close} \div 100 \times \frac{999}{995}$
    - `GOLDM` (100g): $\text{Close} \div 10 \times \frac{999}{995}$
    - `GOLDTEN` (10g): $\text{Close} \div 10$
    - `GOLDGUINEA` (8g): $\text{Close} \div 8$
@@ -95,13 +94,13 @@ AurumSpread/
   - `🛡️ Hedge 250g Gold`: Computes exact integer lot-hedging combinations across contracts with delta mismatch analysis.
   - `🌐 COMEX Import Basis`: Explains current domestic parity, tariff duties, and whether gold is trading at an import premium or discount.
   - `⚠️ Tender Window Risk`: Flags contracts in or approaching the 5-day physical delivery tender window.
-- **Natural Language Parsing**: Type custom questions (e.g., *"How do I hedge 1kg of gold with mini contracts?"*, *"Give me the broker order ticket for GOLDM"*, *"Why is there a tender lockout?"*).
+- **Natural Language Parsing**: Type custom questions (e.g., *"How do I hedge 250g of gold with mini contracts?"*, *"Give me the broker order ticket for GOLDM"*, *"Why is there a tender lockout?"*).
 
 ---
 
 ## 🌟 Stretch Features Highlighted in Presentation
 
-- **📐 Lot-Size Hedge Ratio Optimizer**: Calculates exact delta-neutral integer lot ratios between mismatched contracts (e.g. 1 GOLD 1kg = 10 GOLDM = 100 GOLDTEN = 125 GOLDGUINEA = 1000 GOLDPETAL).
+- **📐 Lot-Size Hedge Ratio Optimizer**: Calculates exact delta-neutral integer lot ratios between mismatched contracts (e.g. 1 GOLDM 100g = 10 GOLDTEN = 12.5 GOLDGUINEA = 100 GOLDPETAL).
 - **🩺 MCX Data Doctor**: Automated Bhavcopy integrity audit checking symbol padding, ISO date formatting, holiday continuity, zero volumes, and contract lifecycle ordering (100/100 score).
 - **🏷️ Retail Micro-Premium Heatmap**: Quantifies retail convenience markups over wholesale mini contracts.
 - **⚡ Calendar Spread Margin Relief**: Integrates MCX's ~75% margin discount on matched calendar spreads into risk & capital allocation.
@@ -156,7 +155,7 @@ AurumSpread/
 ├── data/
 │   ├── raw/                       # Raw daily Bhavcopy CSVs (gitignored; rebuild with scripts/download_mcx.py)
 │   └── processed/                 # Cleaned datasets
-│       └── historical_gold_futures.csv     # 5 Gold contracts (2,445 records)
+│       └── historical_gold_futures.csv     # 4 Gold contracts (1,968 records)
 │
 ├── scripts/                       # Data download, inspection and dataset builders
 │   └── build_expanded_dataset.py   # Gold futures dataset builder
