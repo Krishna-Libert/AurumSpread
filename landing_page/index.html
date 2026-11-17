@@ -1156,33 +1156,20 @@
         }
 
     
-        /* ---- Order ticket code card ---- */
-        .tkt-code-card { background: linear-gradient(160deg, #04195c 0%, #021142 100%); border: 1px solid rgba(197,155,39,0.35); border-radius: 18px; overflow: hidden; box-shadow: 0 18px 40px -18px rgba(2,24,97,0.55), inset 0 1px 0 rgba(255,255,255,0.06); }
-        .tkt-code-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; }
-        .tkt-tabs { display: inline-flex; background: rgba(255,255,255,0.06); border-radius: 999px; padding: 3px; }
-        .tkt-tab { font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: .04em; color: rgba(255,255,255,0.55); padding: 6px 14px; border-radius: 999px; transition: all .2s; }
-        .tkt-tab:hover { color: #fff; }
-        .tkt-tab.active { background: linear-gradient(135deg, #F5C542, #C59B27); color: #021861; box-shadow: 0 4px 12px -4px rgba(197,155,39,0.7); }
-        .tkt-actions { display: inline-flex; gap: 6px; }
-        .tkt-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.85); padding: 6px 11px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.05); transition: all .2s; }
+        /* ---- Order ticket export card ---- */
+        .tkt-code-card { background: linear-gradient(160deg, #04195c 0%, #021142 100%); border: 1px solid rgba(197,155,39,0.35); border-radius: 18px; overflow: hidden; box-shadow: 0 18px 40px -18px rgba(2,24,97,0.55), inset 0 1px 0 rgba(255,255,255,0.06); padding-bottom: 6px; align-self: start; }
+        .tkt-code-meta { display: flex; align-items: center; gap: 8px; padding: 14px 18px 8px; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
+        .tkt-dot { width: 7px; height: 7px; border-radius: 50%; background: #00AEBB; box-shadow: 0 0 8px #00AEBB; }
+        .tkt-broker { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.07); flex-wrap: wrap; }
+        .tkt-broker-name { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 700; color: #fff; }
+        .tkt-broker-sub { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+        .tkt-actions { display: inline-flex; gap: 8px; }
+        .tkt-btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.88); padding: 8px 13px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.05); transition: all .2s; }
         .tkt-btn:hover { background: rgba(255,255,255,0.14); color: #fff; transform: translateY(-1px); }
-        .tkt-btn-gold { border-color: rgba(245,197,66,0.55); color: #F5C542; }
+        .tkt-btn-gold { border-color: rgba(245,197,66,0.6); color: #F5C542; }
         .tkt-btn-gold:hover { background: rgba(245,197,66,0.15); color: #FFD966; }
         .tkt-btn.copied { border-color: #00AEBB; color: #2EE6F2; background: rgba(0,174,187,0.15); }
-        .tkt-code-meta { display: flex; align-items: center; gap: 8px; padding: 8px 16px 0; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,0.45); }
-        .tkt-dot { width: 7px; height: 7px; border-radius: 50%; background: #00AEBB; box-shadow: 0 0 8px #00AEBB; }
-        .tkt-code { margin: 0; padding: 12px 16px 16px; max-height: 330px; overflow: auto; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; line-height: 1.65; color: #E6ECFF; counter-reset: ln; }
-        .tkt-code .ln { display: block; }
-        .tkt-code .ln::before { counter-increment: ln; content: counter(ln); display: inline-block; width: 2.2em; margin-right: 1em; text-align: right; color: rgba(255,255,255,0.22); user-select: none; }
-        .tkt-code .k { color: #7FE3EC; }
-        .tkt-code .s { color: #F5C542; }
-        .tkt-code .n { color: #9FB8FF; }
-        .tkt-code .p { color: rgba(255,255,255,0.4); }
-        .tkt-code .ph { color: #FF9F7A; font-style: italic; }
-        .tkt-code::-webkit-scrollbar { width: 8px; height: 8px; }
-        .tkt-code::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 8px; }
-        .tkt-code-note { padding: 10px 16px 14px; font-size: 10.5px; line-height: 1.5; color: rgba(255,255,255,0.55); border-top: 1px solid rgba(255,255,255,0.06); }
-</style>
+    </style>
 </head>
 <body class="is-loading antialiased selection:bg-cobalt selection:text-white">
 
@@ -2134,29 +2121,37 @@
                                 <p class="text-[10px] text-navy/50 mt-2 leading-snug">Margin figures are estimates from the two assumptions above, not live MCX SPAN margins. Check your broker's margin calculator before trading.</p>
                             </div>
                             <div class="tkt-code-card">
-                                <div class="tkt-code-head">
-                                    <div class="tkt-tabs" role="tablist">
-                                        <button id="tkt-tab-kite" onclick="showTicketBroker('kite')" class="tkt-tab active" role="tab">Zerodha Kite</button>
-                                        <button id="tkt-tab-dhan" onclick="showTicketBroker('dhan')" class="tkt-tab" role="tab">Dhan</button>
+                                <div class="tkt-code-meta"><span class="tkt-dot"></span><span>Send to broker · 2 limit orders</span></div>
+                                <div class="tkt-broker">
+                                    <div>
+                                        <div class="tkt-broker-name">Zerodha Kite</div>
+                                        <div class="tkt-broker-sub">Kite Connect order JSON</div>
                                     </div>
                                     <div class="tkt-actions">
-                                        <button id="tkt-copy-btn" onclick="copyTicket()" class="tkt-btn" title="Copy JSON">
-                                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
-                                            <span>Copy</span>
-                                        </button>
-                                        <button onclick="downloadTicket()" class="tkt-btn" title="Download JSON">
-                                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-                                            <span>JSON</span>
-                                        </button>
-                                        <button onclick="downloadTicket('csv')" class="tkt-btn tkt-btn-gold" title="Download both legs as CSV">
-                                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
-                                            <span>CSV</span>
-                                        </button>
+                                        <button id="tkt-copy-kite" onclick="copyTicket('kite')" class="tkt-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+                                        <button onclick="downloadTicket('kite')" class="tkt-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span>Download</span></button>
                                     </div>
                                 </div>
-                                <div class="tkt-code-meta"><span class="tkt-dot"></span><span id="tkt-endpoint">POST /orders/regular · 2 orders</span></div>
-                                <pre id="tkt-code" class="tkt-code"></pre>
-                                <div id="tkt-code-note" class="tkt-code-note"></div>
+                                <div class="tkt-broker">
+                                    <div>
+                                        <div class="tkt-broker-name">Dhan</div>
+                                        <div class="tkt-broker-sub">DhanHQ order JSON · fill in client ID and securityId</div>
+                                    </div>
+                                    <div class="tkt-actions">
+                                        <button id="tkt-copy-dhan" onclick="copyTicket('dhan')" class="tkt-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span>Copy</span></button>
+                                        <button onclick="downloadTicket('dhan')" class="tkt-btn"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span>Download</span></button>
+                                    </div>
+                                </div>
+                                <div class="tkt-broker">
+                                    <div>
+                                        <div class="tkt-broker-name">Spreadsheet</div>
+                                        <div class="tkt-broker-sub">Both legs as CSV</div>
+                                    </div>
+                                    <div class="tkt-actions">
+                                        <button onclick="downloadTicket('csv')" class="tkt-btn tkt-btn-gold"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg><span>Download CSV</span></button>
+                                    </div>
+                                </div>
+                            </div>
                             </div>
                         </div>
                     </div>
@@ -5136,7 +5131,6 @@
                 warn.textContent = 'Pick a far expiry that is later than the near expiry.';
                 lastTicket = null;
                 ['tkt-legs', 'tkt-summary'].forEach(id => document.getElementById(id).innerHTML = '');
-                renderTicketCode();
                 return;
             }
             const near = recs[ni], far = recs[fi];
@@ -5179,54 +5173,16 @@
             const csv = ['leg_number,role,trading_symbol,exchange,transaction_type,lots,lot_size_grams,quantity_grams,product,order_type,price,expiry_date,validity']
                 .concat(legs.map((l, i) => [i + 1, l.role, l.ts, 'MCX', l.side, lots, spec.lot, grams, 'NRML', 'LIMIT', l.price, tktIso(l.exp), 'DAY'].join(','))).join('\n');
             lastTicket = { kite, dhan, csv, name: `${sym}_${legs[0].ts}_${legs[1].ts}` };
-            renderTicketCode();
         }
-        let tktBroker = 'kite';
-        function tktHighlight(json) {
-            const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            return json.split('\n').map(line => {
-                const m = line.match(/^(\s*)("[^"]+")(\s*:\s*)(.*)$/);
-                let html;
-                if (m) {
-                    let v = m[4], trail = '';
-                    if (v.endsWith(',')) { v = v.slice(0, -1); trail = '<span class="p">,</span>'; }
-                    let vh;
-                    if (/^"<.*>"$/.test(v)) vh = `<span class="ph">${esc(v)}</span>`;
-                    else if (v.startsWith('"')) vh = `<span class="s">${esc(v)}</span>`;
-                    else if (/^-?[\d.]+$/.test(v)) vh = `<span class="n">${v}</span>`;
-                    else vh = `<span class="p">${esc(v)}</span>`;
-                    html = `${m[1]}<span class="k">${esc(m[2])}</span><span class="p">${m[3]}</span>${vh}${trail}`;
-                } else html = `<span class="p">${esc(line)}</span>`;
-                return `<span class="ln">${html}</span>`;
-            }).join('');
-        }
-        function showTicketBroker(b) {
-            tktBroker = b;
-            document.getElementById('tkt-tab-kite').classList.toggle('active', b === 'kite');
-            document.getElementById('tkt-tab-dhan').classList.toggle('active', b === 'dhan');
-            renderTicketCode();
-        }
-        function renderTicketCode() {
-            const code = document.getElementById('tkt-code');
-            if (!lastTicket) { code.innerHTML = ''; return; }
-            code.innerHTML = tktHighlight(JSON.stringify(lastTicket[tktBroker], null, 2));
-            document.getElementById('tkt-endpoint').textContent = tktBroker === 'kite'
-                ? 'Kite Connect · POST /orders/regular · 2 orders'
-                : 'DhanHQ · POST /v2/orders · 2 orders';
-            document.getElementById('tkt-code-note').textContent = tktBroker === 'kite'
-                ? 'For MCX, Kite quantity is the number of lots. Send each object as one order.'
-                : 'Replace YOUR_CLIENT_ID, and look up each securityId in Dhan\'s instrument master before sending.';
-        }
-        function copyTicket() {
+        function copyTicket(kind) {
             if (!lastTicket) return;
-            const txt = JSON.stringify(lastTicket[tktBroker], null, 2);
-            const btn = document.getElementById('tkt-copy-btn');
+            const txt = JSON.stringify(lastTicket[kind], null, 2);
+            const btn = document.getElementById('tkt-copy-' + kind);
             const done = () => { btn.classList.add('copied'); btn.querySelector('span').textContent = 'Copied'; setTimeout(() => { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1600); };
             try { navigator.clipboard.writeText(txt).then(done, done); } catch (e) { done(); }
         }
         function downloadTicket(kind) {
             if (!lastTicket) return;
-            kind = kind || tktBroker;
             const isCsv = kind === 'csv';
             const body = isCsv ? lastTicket.csv : JSON.stringify(lastTicket[kind], null, 2);
             const blob = new Blob([body], { type: isCsv ? 'text/csv' : 'application/json' });
