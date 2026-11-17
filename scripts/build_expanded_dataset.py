@@ -1,7 +1,7 @@
 """Gold Futures Dataset Builder for MCX Bhavcopy.
 
 Ingests all 82 raw MCX Bhavcopy CSV files and builds:
-data/processed/historical_gold_futures.csv (GOLD 1kg, GOLDM, GOLDTEN, GOLDGUINEA, GOLDPETAL)
+data/processed/historical_gold_futures.csv (GOLDM, GOLDTEN, GOLDGUINEA, GOLDPETAL)
 """
 
 from pathlib import Path
@@ -14,7 +14,7 @@ from src.normalize import normalize_commodity_prices
 RAW_DIR = Path("data/raw")
 PROCESSED_DIR = Path("data/processed")
 
-GOLD_SYMBOLS = {"GOLD", "GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"}
+GOLD_SYMBOLS = {"GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"}
 
 
 def build_datasets():

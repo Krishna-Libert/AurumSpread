@@ -17,26 +17,23 @@ from src.copilot_engine import AurumCopilot
 
 def test_normalize_formulas():
     df = pd.DataFrame({
-        "symbol": ["GOLD", "GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"],
-        "close": [75000.0, 75000.0, 75000.0, 60000.0, 7500.0],
+        "symbol": ["GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"],
+        "close": [75000.0, 75000.0, 60000.0, 7500.0],
     })
     res = normalize_gold_prices(df)
-    
-    # GOLD (1kg): 75000 / 10 * (999 / 995)
-    expected_gold = 75000.0 / 10.0 * (999.0 / 995.0)
-    assert abs(res.loc[0, "normalized_price_per_gram"] - expected_gold) < 1e-4
 
     # GOLDM: 75000 / 10 * (999 / 995)
-    assert abs(res.loc[1, "normalized_price_per_gram"] - expected_gold) < 1e-4
+    expected_goldm = 75000.0 / 10.0 * (999.0 / 995.0)
+    assert abs(res.loc[0, "normalized_price_per_gram"] - expected_goldm) < 1e-4
 
     # GOLDTEN: 75000 / 10 = 7500
-    assert abs(res.loc[2, "normalized_price_per_gram"] - 7500.0) < 1e-4
+    assert abs(res.loc[1, "normalized_price_per_gram"] - 7500.0) < 1e-4
 
     # GOLDGUINEA: 60000 / 8 = 7500
-    assert abs(res.loc[3, "normalized_price_per_gram"] - 7500.0) < 1e-4
+    assert abs(res.loc[2, "normalized_price_per_gram"] - 7500.0) < 1e-4
 
     # GOLDPETAL: 7500 / 1 = 7500
-    assert abs(res.loc[4, "normalized_price_per_gram"] - 7500.0) < 1e-4
+    assert abs(res.loc[3, "normalized_price_per_gram"] - 7500.0) < 1e-4
 
 
 def test_tender_period_detection():
