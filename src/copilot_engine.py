@@ -124,8 +124,6 @@ class AurumCopilot:
     def _handle_parity(self) -> str:
         """Calculate and explain MCX vs COMEX Landed Import Parity."""
         parity = calculate_landed_import_parity(
-            comex_usd_per_oz=2650.0,
-            usdinr_rate=84.10,
             domestic_mcx_price_per_g=self.avg_gold_price,
         )
 
@@ -133,7 +131,7 @@ class AurumCopilot:
             f"### 🌐 MCX vs COMEX Import Parity & Landed Basis\n\n"
             f"• **COMEX Gold Benchmark**: `${parity['comex_usd_per_oz']:,}/troy oz`\n"
             f"• **USD/INR Reference**: `₹{parity['usdinr_rate']}`\n"
-            f"• **Tariff Structure**: `5% BCD + 1% AIDC + 10% SWC = {parity['total_tariffs_pct']}% Total Import Duty`\n"
+            f"• **Tariff Structure**: `10% BCD + 5% AIDC = {parity['total_tariffs_pct']}% customs levy (from 13 May 2026), plus 3% IGST`\n"
             f"• **Theoretical Landed Fair Value**: **₹{parity['landed_price_ex_gst_per_g']:,.2f}/g** (₹{parity['landed_price_per_10g_ex_gst']:,.0f}/10g ex-GST)\n"
             f"• **Current Domestic MCX**: **₹{self.avg_gold_price:,.2f}/g**\n\n"
             f"**India Gold Basis (Domestic vs Landed)**:\n"

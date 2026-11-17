@@ -12,14 +12,28 @@ import pandas as pd
 
 TROY_OUNCE_TO_GRAMS = 31.1034768
 
+# Reference inputs for the last session in the dataset (26 Oct 2026).
+# COMEX/LBMA gold close and the RBI-reference USD/INR close for that day.
+REFERENCE_DATE = "26 Oct 2026"
+REFERENCE_COMEX_USD_PER_OZ = 4016.69
+REFERENCE_USDINR = 95.15
+
+# Gold import duty from 13 May 2026 (Customs Notification No. 16/2026):
+# 10% Basic Customs Duty + 5% AIDC = 15% customs levy. Gold is exempt from the
+# Social Welfare Surcharge, so SWC defaults to 0. IGST is 3%.
+BCD_PCT = 10.0
+AIDC_PCT = 5.0
+SWC_PCT = 0.0
+IGST_PCT = 3.0
+
 
 def calculate_landed_import_parity(
-    comex_usd_per_oz: float = 2650.0,
-    usdinr_rate: float = 84.10,
-    customs_duty_pct: float = 5.0,
-    aidc_pct: float = 1.0,
-    swc_pct: float = 10.0,
-    gst_pct: float = 3.0,
+    comex_usd_per_oz: float = REFERENCE_COMEX_USD_PER_OZ,
+    usdinr_rate: float = REFERENCE_USDINR,
+    customs_duty_pct: float = BCD_PCT,
+    aidc_pct: float = AIDC_PCT,
+    swc_pct: float = SWC_PCT,
+    gst_pct: float = IGST_PCT,
     handling_charges_inr_per_g: float = 5.0,
     domestic_mcx_price_per_g: Optional[float] = None,
 ) -> Dict[str, Any]:
@@ -32,11 +46,11 @@ def calculate_landed_import_parity(
     usdinr_rate : float
         USD/INR spot/reference exchange rate.
     customs_duty_pct : float
-        Basic Customs Duty (BCD) % (5.0% post July 2024 budget).
+        Basic Customs Duty (BCD) % (10% from 13 May 2026).
     aidc_pct : float
-        Agriculture Infrastructure & Development Cess % (1.0%).
+        Agriculture Infrastructure & Development Cess % (5% from 13 May 2026).
     swc_pct : float
-        Social Welfare Surcharge % applied on Basic Customs Duty (10.0% of BCD).
+        Social Welfare Surcharge % on BCD (0: gold is exempt).
     gst_pct : float
         Integrated Goods and Services Tax % (3.0% on landed price).
     handling_charges_inr_per_g : float
@@ -129,12 +143,13 @@ def calculate_landed_import_parity(
 
 def generate_historical_parity_series(
     mcx_df: pd.DataFrame,
-    base_comex_usd: float = 2650.0,
-    base_usdinr: float = 84.10,
+    base_comex_usd: float = REFERENCE_COMEX_USD_PER_OZ,
+    base_usdinr: float = REFERENCE_USDINR,
 ) -> pd.DataFrame:
-    """Generate historical daily landed import parity and basis across the dataset.
+    """ILLUSTRATIVE ONLY: simulated parity path, not historical market data.
 
-    Simulates daily international parity tethered to MCX dates for visual comparison.
+    COMEX and USD/INR are generated with a seeded random walk around the base
+    inputs. Do not present the output as real historical parity.
     """
     data = mcx_df.copy()
     data["trade_date"] = pd.to_datetime(data["trade_date"], errors="coerce", format="mixed")
@@ -153,8 +168,8 @@ def generate_historical_parity_series(
     for idx, row in daily_mcx.iterrows():
         t_date = row["trade_date"]
         mcx_px = float(row["normalized_price_per_gram"])
-        sim_comex = max(2300.0, base_comex_usd + float(comex_drift[idx]))
-        sim_fx = max(80.0, base_usdinr + float(fx_drift[idx]))
+        sim_comex = max(1000.0, base_comex_usd + float(comex_drift[idx]))
+        sim_fx = max(50.0, base_usdinr + float(fx_drift[idx]))
 
         parity_info = calculate_landed_import_parity(
             comex_usd_per_oz=sim_comex,
