@@ -4284,6 +4284,16 @@
                 return;
             }
 
+            // The dataset is a fixed historical MCX Bhavcopy snapshot, so show it as
+            // a snapshot (neutral) instead of an age-based freshness warning.
+            const sessions = (DATA && DATA.audit && DATA.audit.trading_days) ? DATA.audit.trading_days : null;
+            applyFreshnessStyle(
+                '#00AEBB', 'rgba(0,174,187,0.35)', '#0B3A5B',
+                `DATA: ${latestDateStr}`,
+                sessions ? `MCX Bhavcopy snapshot · ${sessions} sessions` : 'MCX Bhavcopy snapshot'
+            );
+            return;
+
             const today = new Date();
             // Strip time component for a clean day-level diff
             today.setHours(0, 0, 0, 0);
@@ -4887,12 +4897,19 @@
                 { x: series.dates, y: res.netCurve, mode: 'lines', name: 'Post-Cost Net Realized P&L', line: { color: '#255DCE', width: 3 } }
             ], { ...LAYOUT_BASE, yaxis: { ...LAYOUT_BASE.yaxis, title: 'Cumulative P&L (₹)' } }, PLOT_CFG);
 
-            const rawTrigs = Math.max(1, series.zscore.filter(z => Math.abs(z) >= entryZ).length);
+            // Real counts from the selected series (no assumed filter ratios)
+            let rawTrigs = 0, outsideTender = 0;
+            for (let i = 0; i < series.zscore.length; i++) {
+                if (Math.abs(series.zscore[i]) >= entryZ) {
+                    rawTrigs++;
+                    if (series.dte[i] > tenderDays) outsideTender++;
+                }
+            }
             Plotly.react('chart-funnel', [{
                 type: 'funnel',
-                y: ['Gross Z-Score Deviations', 'Outside 5-Day Tender Zone', 'Liquid Orderbook Filter', 'Completed Roundtrip Trades'],
-                x: [rawTrigs, Math.max(res.trades, Math.round(rawTrigs * 0.75)), Math.max(res.trades, Math.round(rawTrigs * 0.55)), res.trades],
-                marker: { color: ['#255DCE', '#00AEBB', '#C59B27', '#021861'] }
+                y: ['Z-Score Deviation Days', 'Outside Tender Zone', 'Completed Roundtrip Trades'],
+                x: [Math.max(rawTrigs, 1), outsideTender, res.trades],
+                marker: { color: ['#255DCE', '#00AEBB', '#021861'] }
             }], { ...LAYOUT_BASE, margin: { l: 130, r: 20, t: 20, b: 20 } }, PLOT_CFG);
         }
 
