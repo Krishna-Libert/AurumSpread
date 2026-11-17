@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 playwright = pytest.importorskip("playwright", reason="playwright is required for live MCX scraper test")
+pytest.importorskip("pytest_asyncio", reason="pytest-asyncio is required for the live MCX scraper test")
 from playwright.async_api import async_playwright
 
 URL = "https://www.mcxindia.com/market-data/bhavcopy"
