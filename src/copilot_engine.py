@@ -24,6 +24,23 @@ class AurumCopilot:
         self.latest_date = pd.to_datetime(df["trade_date"], errors="coerce", format="mixed").max()
         self.latest_df = df[pd.to_datetime(df["trade_date"], errors="coerce", format="mixed") == self.latest_date]
         self.avg_gold_price = float(self.latest_df["normalized_price_per_gram"].mean()) if not self.latest_df.empty else 7500.0
+        # Parity benchmark: GOLDM + GOLDTEN average on the latest date (same as the website)
+        bench = self.latest_df[self.latest_df["symbol"].isin(["GOLDM", "GOLDTEN"])]
+        self.parity_benchmark_price = (
+            float(bench["normalized_price_per_gram"].mean()) if not bench.empty else self.avg_gold_price
+        )
+
+    def _latest_pair(self, symbol: str = "GOLDM"):
+        """Nearest two expiries of a contract on the latest date: (near_exp, far_exp, near_px, far_px)."""
+        rows = self.latest_df[self.latest_df["symbol"] == symbol].copy()
+        if len(rows) < 2:
+            return None
+        rows["_exp"] = pd.to_datetime(rows["expiry_date"], errors="coerce", format="mixed")
+        rows = rows.dropna(subset=["_exp"]).sort_values("_exp")
+        if len(rows) < 2:
+            return None
+        n, f = rows.iloc[0], rows.iloc[1]
+        return n["_exp"], f["_exp"], float(n["close"]), float(f["close"])
 
     def query(self, user_prompt: str) -> str:
         """Process user trade queries, analyze market state, and return actionable quant advice."""
@@ -124,7 +141,7 @@ class AurumCopilot:
     def _handle_parity(self) -> str:
         """Calculate and explain MCX vs COMEX Landed Import Parity."""
         parity = calculate_landed_import_parity(
-            domestic_mcx_price_per_g=self.avg_gold_price,
+            domestic_mcx_price_per_g=self.parity_benchmark_price,
         )
 
         reply = (
@@ -133,7 +150,7 @@ class AurumCopilot:
             f"• **USD/INR Reference**: `₹{parity['usdinr_rate']}`\n"
             f"• **Tariff Structure**: `10% BCD + 5% AIDC = {parity['total_tariffs_pct']}% customs levy (from 13 May 2026), plus 3% IGST`\n"
             f"• **Theoretical Landed Fair Value**: **₹{parity['landed_price_ex_gst_per_g']:,.2f}/g** (₹{parity['landed_price_per_10g_ex_gst']:,.0f}/10g ex-GST)\n"
-            f"• **Current Domestic MCX**: **₹{self.avg_gold_price:,.2f}/g**\n\n"
+            f"• **MCX (GOLDM + GOLDTEN avg)**: **₹{self.parity_benchmark_price:,.2f}/g**\n\n"
             f"**India Gold Basis (Domestic vs Landed)**:\n"
             f"### {'🟢 ' if parity['basis_inr_per_g'] >= 0 else '🔴 '} Basis: **₹{parity['basis_inr_per_g']:+,.2f}/g** ({parity['basis_pct']:+.2f}%)\n\n"
             f"**Institutional Verdict**: {parity['market_verdict']}\n\n"
@@ -154,24 +171,28 @@ class AurumCopilot:
 
     def _handle_order_ticket(self, prompt: str) -> str:
         """Generate order ticket preview."""
+        pair = self._latest_pair("GOLDM")
+        if pair is None:
+            return "Not enough GOLDM expiries in the latest data to build a calendar spread ticket."
+        near_exp, far_exp, near_px, far_px = pair
         ticket = generate_spread_order_ticket(
             symbol="GOLDM",
-            near_expiry="2026-11-05",
-            far_expiry="2026-12-04",
+            near_expiry=near_exp,
+            far_expiry=far_exp,
             strategy_type="Long Calendar Spread",
             lots=1,
-            near_price=75000.0,
-            far_price=75450.0,
+            near_price=near_px,
+            far_price=far_px,
         )
 
         reply = (
-            "### 📋 2-Leg Order Ticket Generated (GOLDM Nov ➔ Dec)\n\n"
+            f"### 📋 2-Leg Order Ticket (GOLDM {near_exp:%b} ➔ {far_exp:%b}, prices from {self.latest_date:%d %b %Y})\n\n"
             f"• **Strategy**: `{ticket['strategy']}`\n"
             f"• **Leg 1 (Near Month)**: `{ticket['legs'][0]['transaction_type']} 1 lot {ticket['legs'][0]['trading_symbol']} @ LIMIT ₹{ticket['legs'][0]['price']:,.0f}`\n"
             f"• **Leg 2 (Far Month)**: `{ticket['legs'][1]['transaction_type']} 1 lot {ticket['legs'][1]['trading_symbol']} @ LIMIT ₹{ticket['legs'][1]['price']:,.0f}`\n"
             f"• **Net Calendar Spread**: `₹{ticket['net_spread_price']:,.2f}`\n"
-            f"• **Spread Margin Benefit**: Estimated margin is `₹{ticket['estimated_spread_margin_inr']:,.2f}` (Saved **75%** vs unhedged `₹{ticket['estimated_unhedged_margin_inr']:,.2f}`).\n\n"
-            "⬇️ *You can download the full Zerodha Kite / Dhan JSON payload directly from the Order Ticket modal in the header!*"
+            f"• **Margin (estimate)**: about `₹{ticket['estimated_spread_margin_inr']:,.0f}` as a spread vs `₹{ticket['estimated_unhedged_margin_inr']:,.0f}` outright, assuming {ticket['margin_assumptions']}. Check your broker's margin calculator for live figures.\n\n"
+            "⬇️ *The Kite and Dhan JSON payloads are in the Order Ticket panel.*"
         )
         return reply
 
