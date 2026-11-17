@@ -20,6 +20,8 @@ def generate_spread_order_ticket(
     near_price: float = 75000.0,
     far_price: float = 75500.0,
     broker_format: str = "Zerodha Kite",
+    base_margin_pct: float = 10.0,
+    spread_margin_relief_pct: float = 75.0,
 ) -> Dict[str, Any]:
     """Generate a 2-leg execution order ticket for Indian commodity broker APIs.
 
@@ -45,6 +47,11 @@ def generate_spread_order_ticket(
         Current limit / trigger price for far contract.
     broker_format : str
         'Zerodha Kite', 'Dhan', or 'Interactive Brokers'.
+    base_margin_pct : float
+        ASSUMED outright margin as % of notional. Real MCX SPAN + ELM margins
+        change daily; check the broker's margin calculator before trading.
+    spread_margin_relief_pct : float
+        ASSUMED calendar-spread margin offset. Actual MCX spread benefit varies.
 
     Returns
     -------
@@ -77,9 +84,9 @@ def generate_spread_order_ticket(
     near_notional = (near_price / spec.get("quote_unit_grams", 10)) * total_g
     far_notional = (far_price / spec.get("quote_unit_grams", 10)) * total_g
 
-    # Spread margin benefit: MCX provides ~75% margin relief on hedged calendar spreads
-    unhedged_margin = (near_notional + far_notional) * 0.10  # 10% base SPAN
-    spread_hedged_margin = unhedged_margin * 0.25  # 75% relief for calendar hedge
+    # Margin ESTIMATE from the assumed parameters (not live exchange margins)
+    unhedged_margin = (near_notional + far_notional) * (base_margin_pct / 100.0)
+    spread_hedged_margin = unhedged_margin * (1.0 - spread_margin_relief_pct / 100.0)
 
     legs: List[Dict[str, Any]] = [
         {
@@ -114,7 +121,10 @@ def generate_spread_order_ticket(
         },
     ]
 
-    # Broker-specific formats
+    # Broker-specific formats.
+    # Kite Connect: MCX quantity is the number of contracts (lots).
+    # Dhan: securityId is the numeric ID from Dhan's instrument (scrip) master,
+    # not the trading symbol, so it is left as a placeholder to look up.
     zerodha_orders = [
         {
             "variety": "regular",
@@ -139,7 +149,7 @@ def generate_spread_order_ticket(
             "productType": "MARGIN",
             "orderType": "LIMIT",
             "validity": "DAY",
-            "securityId": leg["trading_symbol"],
+            "securityId": f"<DHAN_SECURITY_ID for {leg['trading_symbol']}>",
             "quantity": leg["lots"],
             "price": leg["price"],
         }
@@ -156,7 +166,9 @@ def generate_spread_order_ticket(
         "net_spread_price": round(far_price - near_price, 2),
         "estimated_unhedged_margin_inr": round(unhedged_margin, 2),
         "estimated_spread_margin_inr": round(spread_hedged_margin, 2),
-        "margin_relief_pct": 75.0,
+        "margin_relief_pct": float(spread_margin_relief_pct),
+        "margin_is_estimate": True,
+        "margin_assumptions": f"{base_margin_pct:g}% of notional outright, {spread_margin_relief_pct:g}% calendar-spread offset (assumed)",
         "legs": legs,
         "zerodha_kite_json": zerodha_orders,
         "dhan_json": dhan_orders,
