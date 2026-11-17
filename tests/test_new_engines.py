@@ -168,3 +168,23 @@ def test_aurum_copilot():
     res_specs = copilot.query("What are the contract specs and purities?")
     assert "GOLDM" in res_specs
     assert "995/1000" in res_specs
+
+
+def test_walk_forward_validation_is_out_of_sample():
+    from src.validation_engine import run_walk_forward_validation
+    df = pd.read_csv("data/processed/historical_gold_futures.csv")
+    v = run_walk_forward_validation(df, "2026-10-15", symbols=["GOLDM"])
+    i, o = v["in_sample"], v["out_of_sample"]
+    # the two windows must not overlap, so the test window is genuinely unseen
+    assert i["end"] < o["start"]
+    assert v["selected"]["entry_z"] in (1.5, 2.0, 2.5, 3.0)
+    assert o["trades"] >= 0
+
+
+def test_attribution_splits_gross_pnl():
+    from src.validation_engine import attribute_pnl_vs_underlying
+    df = pd.read_csv("data/processed/historical_gold_futures.csv")
+    a = attribute_pnl_vs_underlying(df, symbols=["GOLDM"])
+    assert a["observations"] > 0
+    # directional + relative-value components must reconstruct gross P&L
+    assert abs(a["directional_pnl"] + a["relative_value_pnl"] - a["gross_pnl"]) < 0.05

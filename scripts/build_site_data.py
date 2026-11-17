@@ -30,6 +30,7 @@ from src import parity_engine  # noqa: E402
 from src.liquidity_engine import calculate_liquidity_depth  # noqa: E402
 from src.spread_engine import calculate_calendar_spreads  # noqa: E402
 from src.spread_intelligence import calculate_spread_intelligence  # noqa: E402
+from src.validation_engine import attribute_pnl_vs_underlying, run_walk_forward_validation  # noqa: E402
 
 DATA_PATH = ROOT / "data" / "processed" / "historical_gold_futures.csv"
 PAGE_PATH = ROOT / "landing_page" / "index.html"
@@ -210,6 +211,21 @@ def build(df: pd.DataFrame) -> dict:
         "feb_apr_val": f"₹{feb_apr_last:.1f}" if feb_apr_last is not None else "—",
     }
 
+    # Out-of-sample validation at several split dates, plus P&L attribution.
+    # Precomputed here because the static page cannot run the Python engines.
+    validation = {}
+    for split in ["2026-09-15", "2026-10-01", "2026-10-15", "2026-11-01"]:
+        if not (df["trade_date"].min() < pd.Timestamp(split) < latest):
+            continue
+        v = run_walk_forward_validation(df, split)
+        validation[split] = {
+            "selected": v["selected"],
+            "verdict": v["verdict"],
+            "in_sample": v["in_sample"],
+            "out_of_sample": v["out_of_sample"],
+        }
+    attribution = attribute_pnl_vs_underlying(df)
+
     return {
         "latest_date": latest.strftime(DMY),
         "avg_norm_price": r2(today["normalized_price_per_gram"].mean()),
@@ -224,6 +240,8 @@ def build(df: pd.DataFrame) -> dict:
         "hero_curves": hero_curves,
         "kpi": kpi,
         # COMEX and USD/INR reference for the latest date (see src/parity_engine.py)
+        "validation": validation,
+        "attribution": attribution,
         "parity_ref": {
             "date": parity_engine.REFERENCE_DATE,
             "comex_usd_per_oz": parity_engine.REFERENCE_COMEX_USD_PER_OZ,
