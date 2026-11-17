@@ -1,8 +1,7 @@
-﻿"""MCX Gold Futures Contract Normalization Engine.
+"""MCX Gold Futures Contract Normalization Engine.
 
 Converts all supported MCX gold futures quotes to INR per 1 gram of 999 purity.
 Supported Gold Contracts:
-  - GOLD:       Close / 10 * (999 / 995)   (quoted per 10g, 995 purity, 1 kg / 1000g lot)
   - GOLDM:      Close / 10 * (999 / 995)   (quoted per 10g, 995 purity, 100g lot)
   - GOLDTEN:    Close / 10                 (quoted per 10g, 999 purity, 10g lot)
   - GOLDGUINEA: Close / 8                  (quoted per 8g, 999 purity, 8g lot)
@@ -14,17 +13,6 @@ import pandas as pd
 
 CONTRACT_SPECS: Dict[str, Dict[str, Any]] = {
     # --- Gold Contracts ---
-    "GOLD": {
-        "commodity": "GOLD",
-        "name": "Gold Big 1Kg",
-        "lot_size_grams": 1000,
-        "quote_unit_grams": 10,
-        "purity": 995,
-        "purity_factor": 999 / 995,
-        "expiry_cycle": "5th of expiry month",
-        "tender_period_days": 5,
-        "formula_str": "Close ÷ 10 × (999 / 995)",
-    },
     "GOLDM": {
         "commodity": "GOLD",
         "name": "Gold Mini",
@@ -100,7 +88,6 @@ def normalize_gold_prices(df: pd.DataFrame) -> pd.DataFrame:
 
     formulas = {
         # Gold
-        "GOLD": lambda price: price / 10.0 * (999.0 / 995.0),
         "GOLDM": lambda price: price / 10.0 * (999.0 / 995.0),
         "GOLDTEN": lambda price: price / 10.0,
         "GOLDGUINEA": lambda price: price / 8.0,
