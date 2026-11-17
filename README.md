@@ -1,12 +1,11 @@
 # 🟡 AurumSpread
-### Commodity Derivatives Intelligence & Execution Platform for MCX Bullion Futures
+### Commodity Derivatives Intelligence & Execution Platform for MCX Gold Futures
 **Hack in Hills '26** | **Track 03: Commodity Derivatives Intelligence** | **Final Round**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Tests](https://img.shields.io/badge/pytest-26%20passed-brightgreen.svg)]()
 [![Platform](https://img.shields.io/badge/dashboard-Streamlit-orange.svg)]()
 [![MCX Data](https://img.shields.io/badge/data-MCX%20Bhavcopy-yellow.svg)]()
-[![Commodity](https://img.shields.io/badge/universe-Gold%20%26%20Silver-gold.svg)]()
 
 ---
 
@@ -14,20 +13,20 @@
 
 | Team Member | Role | Core Deliverables |
 |---|---|---|
-| **Shivansh Sahni** | Data & Python Backend | MCX Bhavcopy ingestion across 82 market dates, Gold & Silver normalization (₹/1g 999 gold & ₹/1kg silver), COMEX landed parity model, and expanded multi-commodity database (4,009 rows). |
+| **Shivansh Sahni** | Data & Python Backend | MCX Bhavcopy ingestion across 82 market dates, ₹/1g 999 gold normalization, COMEX landed parity model, and the cleaned gold futures database (2,445 rows). |
 | **Krishna Sharma** | Quant Logic & Backtesting | Day-by-day walk-forward simulator, cost-of-carry decomposition, liquidity penalty, tender lifecycle rules, exchange SPAN margin relief, and Aurum Copilot NLP rule-based engine. |
-| **Dhruv Gupta** | Frontend UI & Outreach | 5-tab institutional Streamlit dashboard, commodity universe switcher, dynamic observation date scrubber, broker ticket export (Kite & Dhan), Plotly analytics, and demo presentation. |
+| **Dhruv Gupta** | Frontend UI & Outreach | 5-tab institutional Streamlit dashboard, dynamic observation date scrubber, broker ticket export (Kite & Dhan), Plotly analytics, and demo presentation. |
 
 ---
 
 ## 🎯 Problem Statement & Theme Alignment
 
 In the Indian commodities market on the **Multi Commodity Exchange (MCX)**:
-- **Same Bullion, Multiple Contracts**: Lot sizes, quotation bases, purities, and expiry cycles diverge across contracts (`GOLD`, `GOLDM`, `GOLDTEN`, `GOLDGUINEA`, `GOLDPETAL` and `SILVER`, `SILVERM`, `SILVERMIC`, `SILVER100`).
+- **Same Gold, Multiple Contracts**: Lot sizes, quotation bases, purities, and expiry cycles diverge across contracts (`GOLD`, `GOLDM`, `GOLDTEN`, `GOLDGUINEA`, `GOLDPETAL`).
 - **Messy MCX Bhavcopy**: Space-padded symbols, mixed date formats (`%d %b %Y` vs `%d%b%Y`), and silent holiday gaps create false signals.
 - **The Arbitrage Mirage**: Apparent calendar spread arbitrage profits vanish once realistic exchange turnover fees, STT/CTT taxes, delivery margins, and thin liquidity haircuts are accounted for.
 - **Continuous Series Rollover Distortion**: Retail terminals (e.g. TradingView continuous contracts) stitch together contracts, introducing artificial price jumps at expiry that corrupt econometric spreads.
-- **Global vs Domestic Disconnect**: Physical bullion traders and hedgers struggle to reconcile international COMEX benchmark prices (USD/oz) with Indian landed import parity (BCD + AIDC + SWC duties + USD/INR + GST).
+- **Global vs Domestic Disconnect**: Physical gold traders and hedgers struggle to reconcile international COMEX benchmark prices (USD/oz) with Indian landed import parity (BCD + AIDC + SWC duties + USD/INR + GST).
 
 ### Theme Alignment: Track 03 (Commodity Derivatives Intelligence)
 AurumSpread delivers **institutional analytical rigor over daily signals**: proving whether an apparent edge survives realistic transaction costs, providing actionable landed import parity intelligence, generating broker-ready execution tickets, and equipping traders with an interactive AI Quant Copilot.
@@ -39,7 +38,7 @@ AurumSpread delivers **institutional analytical rigor over daily signals**: prov
 1. **Contract-by-Contract Lifecycle Engine**  
    Every contract is tracked as an independent `(Symbol, Expiry)` pair. Eliminates artificial rollover jumps and blocks new entries during illiquid and **MCX physical tender windows** (5 days pre-expiry).
 2. **Unit + Purity + Carry Normalization**  
-   Converts all gold contracts to a uniform **₹ per 1 gram of 999 purity gold** and silver contracts to **₹ per 1 kg**:
+   Converts all gold contracts to a uniform **₹ per 1 gram of 999 purity gold**:
    - `GOLD` (1kg): $\text{Close} \div 100 \times \frac{999}{995}$
    - `GOLDM` (100g): $\text{Close} \div 10 \times \frac{999}{995}$
    - `GOLDTEN` (10g): $\text{Close} \div 10$
@@ -61,9 +60,8 @@ AurumSpread delivers **institutional analytical rigor over daily signals**: prov
 
 ```text
 AurumSpread/
-├── 🟡/⚪ Commodity Universe Switcher   → Instant toggle between MCX Gold and Silver contracts
 ├── 📅 Dynamic Date Scrubber          → Historical replay across 82 daily market dates
-├── Tab 1: Fair Price & Quiet Alert   → Normalized ₹/g & ₹/kg snapshots; alerts only post-cost
+├── Tab 1: Fair Price & Quiet Alert   → Normalized ₹/g snapshots; alerts only post-cost
 ├── Tab 2: Expiry Calendar & Depth    → Lifecycle timeline, volume & OI depth, tender lockout zones
 ├── Tab 3: Curves, Carry & Parity     → Term structure, carry rate, retail micro-premium & COMEX Parity
 ├── Tab 4: Simulator & Order Tickets  → Walk-forward replay, "What kills the edge?", Kite/Dhan tickets
@@ -71,7 +69,7 @@ AurumSpread/
 ```
 
 ### 1. Tab 1: Fair Price & Quiet Alert
-- **Multi-Contract Normalized Snapshot**: Real-time comparison of all contracts on a standardized ₹/g (Gold) or ₹/kg (Silver) benchmark.
+- **Multi-Contract Normalized Snapshot**: Real-time comparison of all contracts on a standardized ₹/g of 999 gold benchmark.
 - **Quiet Alert System**: Scans all active spread pairs on the selected market date. Alerts fire **only** when a post-cost executable edge ($> 0$) survives all statutory charges, slippage, and liquidity filters. Suppresses noise and false arbitrage traps.
 
 ### 2. Tab 2: Expiry Calendar & Liquidity
@@ -114,7 +112,7 @@ AurumSpread/
 
 | Capability | Retail Terminals (Zerodha, Groww) | Charting (TradingView) | Derivatives Portals (Sensibull) | Institutional (Bloomberg) | **AurumSpread** |
 |---|---|---|---|---|---|
-| **Purity & Unit Normalization** | ❌ Raw quote only | ❌ None | ❌ None | ⚠️ Manual formula | ✅ **Automated (995 to 999 ₹/g & ₹/kg)** |
+| **Purity & Unit Normalization** | ❌ Raw quote only | ❌ None | ❌ None | ⚠️ Manual formula | ✅ **Automated (995 to 999 ₹/g)** |
 | **No Rollover Discontinuity** | ❌ Rollover jumps | ❌ Continuous jumps | ❌ None | ⚠️ Manual roll rules | ✅ **Contract-by-contract lifecycle** |
 | **MCX Tender Period Lockout** | ❌ None | ❌ None | ❌ None | ❌ Custom setup | ✅ **Automated 5-day tender lockout** |
 | **Dynamic Liquidity Haircut** | ❌ Uses settlement px | ❌ None | ❌ None | ⚠️ Static bid-ask | ✅ **Dynamic Volume/OI haircut** |
@@ -142,7 +140,7 @@ AurumSpread/
 ├── pytest.ini                     # Pytest configuration
 │
 ├── src/                           # Core Analytical Engines
-│   ├── normalize.py               # Unit & 999 purity normalization (Gold + Silver)
+│   ├── normalize.py               # Unit & 999 purity normalization
 │   ├── spread_engine.py           # Calendar spread pair generator
 │   ├── spread_intelligence.py     # Expanding-window Z-score & percentiles
 │   ├── carry_engine.py            # Forward curve, annualized carry & micro-premium
@@ -158,12 +156,10 @@ AurumSpread/
 ├── data/
 │   ├── raw/                       # Raw daily Bhavcopy CSVs (gitignored; rebuild with scripts/download_mcx.py)
 │   └── processed/                 # Cleaned datasets
-│       ├── historical_gold_futures.csv     # 5 Gold contracts (2,445 records)
-│       ├── historical_silver_futures.csv   # 4 Silver contracts (1,564 records)
-│       └── historical_bullion_futures.csv  # Unified Bullion dataset (4,009 records)
+│       └── historical_gold_futures.csv     # 5 Gold contracts (2,445 records)
 │
 ├── scripts/                       # Data download, inspection and dataset builders
-│   └── build_expanded_dataset.py   # Multi-commodity Gold + Silver builder
+│   └── build_expanded_dataset.py   # Gold futures dataset builder
 │
 └── tests/                         # 26 automated pytest test cases
     └── test_*.py                  # backtest, spreads, ingest, leakage, new engines
@@ -207,7 +203,6 @@ Open your browser at `http://localhost:8501`.
 
 - [x] **Track 03 Alignment**: Rigorous commodity derivatives intelligence with cost-of-carry and walk-forward backtesting.
 - [x] **6 Core USPs Implemented**: Contract lifecycle, unit+purity normalization, liquidity-penalised fill, honest survival proof, COMEX landed parity, and 2-leg broker tickets.
-- [x] **Multi-Commodity Expansion**: Full support for both Gold (`GOLD`, `GOLDM`, `GOLDTEN`, `GOLDGUINEA`, `GOLDPETAL`) and Silver (`SILVER`, `SILVERM`, `SILVERMIC`, `SILVER100`).
 - [x] **5-Tab Trader Dashboard**: Intuitive institutional UI with dynamic date replay, interactive Plotly visuals, and zero raw code leaks.
 - [x] **Aurum Copilot AI**: Interactive Quant Assistant with prompt chips and conversational hedging/pricing intelligence.
 - [x] **100% Passing Test Suite**: 26 automated pytest tests verifying data integrity, quant models, and zero future data leakage.
