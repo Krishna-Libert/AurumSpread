@@ -1,9 +1,7 @@
-"""Expanded Dataset Builder for MCX Gold and Silver Futures.
+"""Gold Futures Dataset Builder for MCX Bhavcopy.
 
 Ingests all 82 raw MCX Bhavcopy CSV files and builds:
-1. data/processed/historical_gold_futures.csv (GOLD 1kg, GOLDM, GOLDTEN, GOLDGUINEA, GOLDPETAL)
-2. data/processed/historical_silver_futures.csv (SILVER 30kg, SILVERM 5kg, SILVERMIC 1kg, SILVER100)
-3. data/processed/historical_bullion_futures.csv (Unified multi-commodity dataset)
+data/processed/historical_gold_futures.csv (GOLD 1kg, GOLDM, GOLDTEN, GOLDGUINEA, GOLDPETAL)
 """
 
 from pathlib import Path
@@ -17,8 +15,6 @@ RAW_DIR = Path("data/raw")
 PROCESSED_DIR = Path("data/processed")
 
 GOLD_SYMBOLS = {"GOLD", "GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"}
-SILVER_SYMBOLS = {"SILVER", "SILVERM", "SILVERMIC", "SILVER100"}
-ALL_BULLION = GOLD_SYMBOLS | SILVER_SYMBOLS
 
 
 def build_datasets():
@@ -41,9 +37,9 @@ def build_datasets():
 
     combined["Strike Price"] = pd.to_numeric(combined["Strike Price"], errors="coerce")
 
-    # Filter bullion futures
+    # Filter gold futures
     bullion = combined[
-        combined["Symbol"].isin(ALL_BULLION)
+        combined["Symbol"].isin(GOLD_SYMBOLS)
         & combined["Instrument Name"].eq("FUTCOM")
         & combined["Option Type"].eq("-")
         & combined["Strike Price"].eq(0)
@@ -83,17 +79,6 @@ def build_datasets():
     gold_out = PROCESSED_DIR / "historical_gold_futures.csv"
     gold_df.to_csv(gold_out, index=False)
     print(f"Saved Gold dataset to {gold_out} ({len(gold_df)} rows, symbols: {gold_df['symbol'].unique()})")
-
-    # 2. Silver Dataset
-    silver_df = bullion[bullion["symbol"].isin(SILVER_SYMBOLS)].copy()
-    silver_out = PROCESSED_DIR / "historical_silver_futures.csv"
-    silver_df.to_csv(silver_out, index=False)
-    print(f"Saved Silver dataset to {silver_out} ({len(silver_df)} rows, symbols: {silver_df['symbol'].unique()})")
-
-    # 3. Unified Bullion Dataset
-    bullion_out = PROCESSED_DIR / "historical_bullion_futures.csv"
-    bullion.to_csv(bullion_out, index=False)
-    print(f"Saved Unified Bullion dataset to {bullion_out} ({len(bullion)} rows)")
 
 
 if __name__ == "__main__":
