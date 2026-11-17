@@ -12,11 +12,12 @@ import pandas as pd
 
 TROY_OUNCE_TO_GRAMS = 31.1034768
 
-# Reference inputs for the last session in the dataset (26 Oct 2026).
-# COMEX/LBMA gold close and the RBI-reference USD/INR close for that day.
-REFERENCE_DATE = "26 Oct 2026"
-REFERENCE_COMEX_USD_PER_OZ = 4016.69
-REFERENCE_USDINR = 95.15
+# Reference inputs for the last session in the dataset (17 Nov 2026):
+# spot gold (XAU/USD) at the 4:30 pm ET close, and the USD/INR interbank close
+# (93.51, provisional, PTI). Update these whenever the dataset is extended.
+REFERENCE_DATE = "17 Nov 2026"
+REFERENCE_COMEX_USD_PER_OZ = 3849.59
+REFERENCE_USDINR = 93.51
 
 # Gold import duty from 13 May 2026 (Customs Notification No. 16/2026):
 # 10% Basic Customs Duty + 5% AIDC = 15% customs levy. Gold is exempt from the

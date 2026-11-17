@@ -120,8 +120,10 @@ def test_landed_import_parity():
 
 
 def test_landed_parity_2026_duty_defaults():
-    # 26 Oct 2026: COMEX $4,016.69/oz, USD/INR 95.15, 10% BCD + 5% AIDC, no SWC
-    res = calculate_landed_import_parity(domestic_mcx_price_per_g=14550.0)
+    # 2026 duty structure: 10% BCD + 5% AIDC, no SWC, Rs 5/g handling
+    res = calculate_landed_import_parity(
+        comex_usd_per_oz=4016.69, usdinr_rate=95.15, domestic_mcx_price_per_g=14550.0
+    )
     cif = 4016.69 / 31.1034768 * 95.15
     expected_ex_gst = cif * 1.15 + 5.0
     assert abs(res["landed_price_ex_gst_per_g"] - round(expected_ex_gst, 2)) < 0.01
