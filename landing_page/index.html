@@ -1803,7 +1803,7 @@
                     02 // Expiry Calendar & Liquidity
                 </button>
                 <button onclick="switchTab('tab3')" id="tab-btn-tab3" class="tab-btn flex-1 py-3 px-4 rounded-xl font-mono font-bold text-xs uppercase tracking-wider text-navy/60 hover:text-navy transition-all">
-                    03 // Futures Curve & Carry
+                    03 // Curve, Carry & Parity
                 </button>
                 <button onclick="switchTab('tab4')" id="tab-btn-tab4" class="tab-btn flex-1 py-3 px-4 rounded-xl font-mono font-bold text-xs uppercase tracking-wider text-navy/60 hover:text-navy transition-all">
                     04 // Profit vs Fees Simulator
@@ -2002,6 +2002,32 @@
                         <h4 class="font-serif text-xl font-bold text-navy">🏷️ Retail Micro-Premium Analysis (Markup Over Wholesale GOLDM)</h4>
                         <p class="text-xs text-navy/60 mb-3">Persistent convenience premium paid by retail traders in GOLDPETAL (1g) and GOLDGUINEA (8g) relative to GOLDM (100g)</p>
                         <div id="chart-micro-premium" class="w-full h-[330px]"></div>
+                    </div>
+                </div>
+
+                <!-- COMEX LANDED IMPORT PARITY (mirrors src/parity_engine.py) -->
+                <div class="paper-sheet p-6" id="parity-panel">
+                    <div class="reticle-tl"></div><div class="reticle-tr"></div><div class="reticle-bl"></div><div class="reticle-br"></div>
+                    <div class="paper-content">
+                        <h4 class="font-serif text-xl font-bold text-navy">🌐 MCX vs COMEX Landed Import Parity</h4>
+                        <p class="text-xs text-navy/60 mb-4">What imported gold costs in India after duty, compared with the MCX price. Inputs are the 26 Oct 2026 reference values and can be edited.</p>
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div class="grid grid-cols-2 gap-3 content-start">
+                                <label class="block"><span class="text-[10px] font-mono uppercase tracking-wider text-navy/60">COMEX Gold ($/oz)</span><input id="par-comex" type="number" value="4016.69" step="1" oninput="calcParity()" class="w-full border border-navy/20 bg-white/75 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-navy"></label>
+                                <label class="block"><span class="text-[10px] font-mono uppercase tracking-wider text-navy/60">USD/INR</span><input id="par-fx" type="number" value="95.15" step="0.05" oninput="calcParity()" class="w-full border border-navy/20 bg-white/75 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-navy"></label>
+                                <label class="block"><span class="text-[10px] font-mono uppercase tracking-wider text-navy/60">Basic Customs Duty %</span><input id="par-bcd" type="number" value="10" step="0.5" oninput="calcParity()" class="w-full border border-navy/20 bg-white/75 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-navy"></label>
+                                <label class="block"><span class="text-[10px] font-mono uppercase tracking-wider text-navy/60">AIDC %</span><input id="par-aidc" type="number" value="5" step="0.5" oninput="calcParity()" class="w-full border border-navy/20 bg-white/75 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-navy"></label>
+                                <label class="block"><span class="text-[10px] font-mono uppercase tracking-wider text-navy/60">IGST %</span><input id="par-gst" type="number" value="3" step="0.5" oninput="calcParity()" class="w-full border border-navy/20 bg-white/75 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-navy"></label>
+                                <label class="block"><span class="text-[10px] font-mono uppercase tracking-wider text-navy/60">Handling ₹/g</span><input id="par-handling" type="number" value="5" step="1" oninput="calcParity()" class="w-full border border-navy/20 bg-white/75 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-navy"></label>
+                                <p class="col-span-2 text-[10px] text-navy/50 leading-snug">Duty from 13 May 2026: 10% BCD + 5% AIDC (Customs Notification 16/2026). MCX futures are quoted ex-GST, so the basis compares against the ex-GST landed price.</p>
+                            </div>
+                            <div class="lg:col-span-2">
+                                <table class="w-full text-left border-collapse text-xs font-mono">
+                                    <tbody id="parity-breakdown"></tbody>
+                                </table>
+                                <div id="parity-verdict" class="mt-4 rounded-xl border p-4"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -4949,6 +4975,49 @@
             runBacktestInJS();
         }
 
+
+        // ===== COMEX landed import parity: same formula as src/parity_engine.py =====
+        const TROY_OZ_G = 31.1034768;
+        function mcxParityBenchmark() {
+            const recs = (DATA && DATA.latest_records) ? DATA.latest_records.filter(r => r.symbol === 'GOLDM' || r.symbol === 'GOLDTEN') : [];
+            return recs.length ? recs.reduce((a, r) => a + r.norm_price, 0) / recs.length : null;
+        }
+        function calcParity() {
+            const v = id => parseFloat(document.getElementById(id).value) || 0;
+            const comex = v('par-comex'), fx = v('par-fx'), bcdPct = v('par-bcd'), aidcPct = v('par-aidc'), gstPct = v('par-gst'), handling = v('par-handling');
+            const cif = comex / TROY_OZ_G * fx;
+            const bcd = cif * bcdPct / 100, aidc = cif * aidcPct / 100;
+            const exGst = cif + bcd + aidc + handling;
+            const incGst = exGst * (1 + gstPct / 100);
+            const mcx = mcxParityBenchmark();
+            const fmt = x => '₹' + x.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const rows = [
+                ['COMEX in ₹/g (CIF)', fmt(cif)],
+                [`Basic Customs Duty (${bcdPct}%)`, '+ ' + fmt(bcd)],
+                [`AIDC (${aidcPct}%)`, '+ ' + fmt(aidc)],
+                ['Handling & finance', '+ ' + fmt(handling)],
+                ['Landed price, ex-GST', fmt(exGst)],
+                [`Landed price incl. ${gstPct}% IGST`, fmt(incGst)],
+                ['MCX price (GOLDM + GOLDTEN avg, 26 Oct)', mcx ? fmt(mcx) : '—']
+            ];
+            document.getElementById('parity-breakdown').innerHTML = rows.map((r, i) =>
+                `<tr class="border-b border-navy/10 ${i === 4 ? 'font-bold text-navy' : 'text-navy/75'}"><td class="p-2">${r[0]}</td><td class="p-2 text-right">${r[1]}</td></tr>`).join('');
+            const box = document.getElementById('parity-verdict');
+            if (!mcx || exGst <= 0) { box.textContent = 'MCX price unavailable'; return; }
+            const basis = mcx - exGst, pct = basis / exGst * 100;
+            let title, note, color;
+            if (basis > 20) { title = 'Domestic premium over landed parity'; color = '#C59B27';
+                note = 'MCX trades above the cost of importing gold. Importing physical gold is profitable on paper, which usually pulls domestic prices down.'; }
+            else if (basis < -20) { title = 'Domestic discount to landed parity'; color = '#255DCE';
+                note = 'MCX trades below the cost of importing gold, so official imports stall.'; }
+            else { title = 'At parity'; color = '#00AEBB'; note = 'MCX is in line with the landed import cost.'; }
+            box.style.borderColor = color;
+            box.innerHTML = `<div class="text-[10px] font-mono uppercase tracking-wider text-navy/60">India gold basis (MCX − landed, ex-GST)</div>
+                <div class="font-serif text-2xl font-bold" style="color:${color}">${basis >= 0 ? '+' : '−'}${fmt(Math.abs(basis))}/g (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)</div>
+                <div class="text-xs font-bold text-navy mt-1">${title}</div>
+                <div class="text-xs text-navy/70 mt-1">${note}</div>`;
+        }
+
         function switchTab(tabId) {
             document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(b => {
@@ -5028,6 +5097,7 @@
         onBtSymbolChange();
         calcHedge();
         calcPurity();
+        calcParity();
     </script>
 </body>
 </html>
