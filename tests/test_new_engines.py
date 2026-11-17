@@ -10,10 +10,17 @@ from src.liquidity_engine import is_tender_period, calculate_liquidity_depth, es
 from src.hedge_optimizer import calculate_optimal_hedge
 from src.data_doctor import audit_dataset_health
 from src.quiet_alerts import scan_quiet_alerts
+<<<<<<< HEAD
+=======
+from src.parity_engine import calculate_landed_import_parity, generate_historical_parity_series
+from src.order_ticket import generate_spread_order_ticket, export_order_ticket_csv
+from src.copilot_engine import AurumCopilot
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
 
 
 def test_normalize_formulas():
     df = pd.DataFrame({
+<<<<<<< HEAD
         "symbol": ["GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"],
         "close": [75000.0, 75000.0, 60000.0, 7500.0],
     })
@@ -31,6 +38,29 @@ def test_normalize_formulas():
     # GOLDPETAL: 7500 / 1 = 7500
     assert abs(res.loc[3, "normalized_price_per_gram"] - 7500.0) < 1e-4
 
+=======
+        "symbol": ["GOLD", "GOLDM", "GOLDTEN", "GOLDGUINEA", "GOLDPETAL"],
+        "close": [75000.0, 75000.0, 75000.0, 60000.0, 7500.0],
+    })
+    res = normalize_gold_prices(df)
+    
+    # GOLD (1kg): 75000 / 10 * (999 / 995)
+    expected_gold = 75000.0 / 10.0 * (999.0 / 995.0)
+    assert abs(res.loc[0, "normalized_price_per_gram"] - expected_gold) < 1e-4
+
+    # GOLDM: 75000 / 10 * (999 / 995)
+    assert abs(res.loc[1, "normalized_price_per_gram"] - expected_gold) < 1e-4
+
+    # GOLDTEN: 75000 / 10 = 7500
+    assert abs(res.loc[2, "normalized_price_per_gram"] - 7500.0) < 1e-4
+
+    # GOLDGUINEA: 60000 / 8 = 7500
+    assert abs(res.loc[3, "normalized_price_per_gram"] - 7500.0) < 1e-4
+
+    # GOLDPETAL: 7500 / 1 = 7500
+    assert abs(res.loc[4, "normalized_price_per_gram"] - 7500.0) < 1e-4
+
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
 
 def test_tender_period_detection():
     # 3 days before expiry is tender period
@@ -66,7 +96,10 @@ def test_hedge_optimizer():
 
     # GOLDGUINEA (8g) vs GOLDTEN (10g)
     hedge2 = calculate_optimal_hedge("GOLDGUINEA", "GOLDTEN", lots_a=1)
+<<<<<<< HEAD
     # 1 lot of 8g -> 1 lot of 10g (residual mismatch = 2g)
+=======
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
     assert hedge2["residual_mismatch_grams"] == 2
     assert "5 GOLDGUINEA : 4 GOLDTEN" in hedge2["exact_zero_delta_ratio"]
 
@@ -98,3 +131,62 @@ def test_carry_and_micro_premium():
     prem = calculate_retail_micro_premium(df)
     assert not prem.empty
     assert "premium_inr_per_g" in prem.columns
+<<<<<<< HEAD
+=======
+
+
+def test_landed_import_parity():
+    res = calculate_landed_import_parity(
+        comex_usd_per_oz=2650.0,
+        usdinr_rate=84.0,
+        customs_duty_pct=5.0,
+        aidc_pct=1.0,
+        swc_pct=10.0,
+        gst_pct=3.0,
+        domestic_mcx_price_per_g=7500.0,
+    )
+    assert res["landed_price_ex_gst_per_g"] > 0
+    assert res["landed_price_inc_gst_per_g"] > res["landed_price_ex_gst_per_g"]
+    assert res["basis_inr_per_g"] is not None
+    assert "market_verdict" in res
+
+
+def test_order_ticket_generation():
+    ticket = generate_spread_order_ticket(
+        symbol="GOLDM",
+        near_expiry="2026-11-05",
+        far_expiry="2026-12-04",
+        strategy_type="Long Calendar Spread",
+        lots=2,
+        near_price=75000.0,
+        far_price=75500.0,
+    )
+    assert len(ticket["legs"]) == 2
+    assert ticket["legs"][0]["transaction_type"] == "SELL"
+    assert ticket["legs"][1]["transaction_type"] == "BUY"
+    assert ticket["margin_relief_pct"] == 75.0
+    assert len(ticket["zerodha_kite_json"]) == 2
+
+    csv_data = export_order_ticket_csv(ticket)
+    assert "Near Month Leg" in csv_data
+
+
+def test_aurum_copilot():
+    data_path = Path("data/processed/historical_gold_futures.csv")
+    if not data_path.exists():
+        pytest.skip("Historical dataset not found")
+
+    df = pd.read_csv(data_path)
+    copilot = AurumCopilot(df)
+
+    res_hedge = copilot.query("How to hedge 500 grams of gold?")
+    assert "500" in res_hedge
+    assert "GOLDM" in res_hedge
+
+    res_parity = copilot.query("What is the COMEX import parity?")
+    assert "COMEX Gold Benchmark" in res_parity
+
+    res_specs = copilot.query("What are the contract specs and purities?")
+    assert "GOLDM" in res_specs
+    assert "995/1000" in res_specs
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1

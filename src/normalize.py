@@ -1,7 +1,15 @@
+<<<<<<< HEAD
 """MCX Gold Contract Normalization Engine.
 
 Converts all supported MCX gold futures quotes to INR per 1 gram of 999 purity.
 Formulas:
+=======
+"""MCX Gold Futures Contract Normalization Engine.
+
+Converts all supported MCX gold futures quotes to INR per 1 gram of 999 purity.
+Supported Gold Contracts:
+  - GOLD:       Close / 10 * (999 / 995)   (quoted per 10g, 995 purity, 1 kg / 1000g lot)
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
   - GOLDM:      Close / 10 * (999 / 995)   (quoted per 10g, 995 purity, 100g lot)
   - GOLDTEN:    Close / 10                 (quoted per 10g, 999 purity, 10g lot)
   - GOLDGUINEA: Close / 8                  (quoted per 8g, 999 purity, 8g lot)
@@ -12,7 +20,24 @@ from typing import Dict, Any
 import pandas as pd
 
 CONTRACT_SPECS: Dict[str, Dict[str, Any]] = {
+<<<<<<< HEAD
     "GOLDM": {
+=======
+    # --- Gold Contracts ---
+    "GOLD": {
+        "commodity": "GOLD",
+        "name": "Gold Big 1Kg",
+        "lot_size_grams": 1000,
+        "quote_unit_grams": 10,
+        "purity": 995,
+        "purity_factor": 999 / 995,
+        "expiry_cycle": "5th of expiry month",
+        "tender_period_days": 5,
+        "formula_str": "Close ÷ 10 × (999 / 995)",
+    },
+    "GOLDM": {
+        "commodity": "GOLD",
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
         "name": "Gold Mini",
         "lot_size_grams": 100,
         "quote_unit_grams": 10,
@@ -23,6 +48,10 @@ CONTRACT_SPECS: Dict[str, Dict[str, Any]] = {
         "formula_str": "Close ÷ 10 × (999 / 995)",
     },
     "GOLDTEN": {
+<<<<<<< HEAD
+=======
+        "commodity": "GOLD",
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
         "name": "Gold 10 Grams",
         "lot_size_grams": 10,
         "quote_unit_grams": 10,
@@ -33,6 +62,10 @@ CONTRACT_SPECS: Dict[str, Dict[str, Any]] = {
         "formula_str": "Close ÷ 10",
     },
     "GOLDGUINEA": {
+<<<<<<< HEAD
+=======
+        "commodity": "GOLD",
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
         "name": "Gold Guinea",
         "lot_size_grams": 8,
         "quote_unit_grams": 8,
@@ -43,6 +76,10 @@ CONTRACT_SPECS: Dict[str, Dict[str, Any]] = {
         "formula_str": "Close ÷ 8",
     },
     "GOLDPETAL": {
+<<<<<<< HEAD
+=======
+        "commodity": "GOLD",
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
         "name": "Gold Petal",
         "lot_size_grams": 1,
         "quote_unit_grams": 1,
@@ -56,7 +93,11 @@ CONTRACT_SPECS: Dict[str, Dict[str, Any]] = {
 
 
 def normalize_gold_prices(df: pd.DataFrame) -> pd.DataFrame:
+<<<<<<< HEAD
     """Convert supported MCX gold futures quotes to ₹/gram, adjusted to 999 purity.
+=======
+    """Convert supported MCX commodity futures quotes to ₹/gram, adjusted to 999 purity.
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
 
     Parameters
     ----------
@@ -82,6 +123,11 @@ def normalize_gold_prices(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     formulas = {
+<<<<<<< HEAD
+=======
+        # Gold
+        "GOLD": lambda price: price / 10.0 * (999.0 / 995.0),
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
         "GOLDM": lambda price: price / 10.0 * (999.0 / 995.0),
         "GOLDTEN": lambda price: price / 10.0,
         "GOLDGUINEA": lambda price: price / 8.0,
@@ -103,3 +149,10 @@ def normalize_gold_prices(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return result
+<<<<<<< HEAD
+=======
+
+
+# Backward-compatible alias
+normalize_commodity_prices = normalize_gold_prices
+>>>>>>> 89235d3b588cfa496b409f8ec238c511a4fd88b1
