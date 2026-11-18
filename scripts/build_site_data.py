@@ -30,6 +30,7 @@ from src import parity_engine  # noqa: E402
 from src.liquidity_engine import calculate_liquidity_depth  # noqa: E402
 from src.spread_engine import calculate_calendar_spreads  # noqa: E402
 from src.spread_intelligence import calculate_spread_intelligence  # noqa: E402
+from src.agent_verification import verify_against_dataset  # noqa: E402
 from src.validation_engine import attribute_pnl_vs_underlying, run_walk_forward_validation  # noqa: E402
 
 DATA_PATH = ROOT / "data" / "processed" / "historical_gold_futures.csv"
@@ -225,6 +226,7 @@ def build(df: pd.DataFrame) -> dict:
             "out_of_sample": v["out_of_sample"],
         }
     attribution = attribute_pnl_vs_underlying(df)
+    agent_verification = verify_against_dataset(df)
 
     return {
         "latest_date": latest.strftime(DMY),
@@ -241,6 +243,7 @@ def build(df: pd.DataFrame) -> dict:
         "kpi": kpi,
         # COMEX and USD/INR reference for the latest date (see src/parity_engine.py)
         "validation": validation,
+        "agent_verification": agent_verification,
         "attribution": attribution,
         "parity_ref": {
             "date": parity_engine.REFERENCE_DATE,

@@ -188,3 +188,27 @@ def test_attribution_splits_gross_pnl():
     assert a["observations"] > 0
     # directional + relative-value components must reconstruct gross P&L
     assert abs(a["directional_pnl"] + a["relative_value_pnl"] - a["gross_pnl"]) < 0.05
+
+
+def test_agent_verification_matches_dataset():
+    from src.agent_verification import parse_mcx_expiry, verify_against_dataset
+    assert parse_mcx_expiry("04DEC2026") == pd.Timestamp("2026-12-04")
+    assert parse_mcx_expiry("not a date") is None
+    df = pd.read_csv("data/processed/historical_gold_futures.csv")
+    r = verify_against_dataset(df)
+    assert r["total"] > 0
+    # every recorded agent observation must still agree with the dataset
+    assert r["all_passed"], [c for c in r["checks"] if not c["passed"]]
+
+
+def test_agent_verification_detects_a_wrong_row():
+    from src.agent_verification import verify_against_dataset
+    df = pd.read_csv("data/processed/historical_gold_futures.csv")
+    bad = [{
+        "kind": "row_integrity",
+        "trade_date": "2026-11-17",
+        "rows": [{"symbol": "GOLDM", "expiry_date": "04DEC2026",
+                  "close": 1.0, "volume_lots": 1, "open_interest_lots": 1}],
+    }]
+    r = verify_against_dataset(df, runs=bad)
+    assert r["failed"] == 1 and not r["all_passed"]

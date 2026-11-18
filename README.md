@@ -5,7 +5,7 @@
 **Hack in Hills '26** · **Track 03: Commodity Derivatives Intelligence** · **Final Round**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/pytest-29%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/pytest-31%20passed-brightgreen.svg)]()
 [![Data](https://img.shields.io/badge/MCX%20Bhavcopy-99%20sessions-yellow.svg)]()
 [![Scope](https://img.shields.io/badge/universe-4%20MCX%20gold%20contracts-gold.svg)]()
 
@@ -84,9 +84,19 @@ Both are reproducible: `src/validation_engine.py`, shown live in the
    SWC, 3% IGST), giving the India gold basis.
 7. **Broker-ready 2-leg order tickets.** A viable spread exports as Zerodha Kite
    Connect and DhanHQ order payloads, or CSV.
-8. **Agent-verified data integrity.** A TinyFish web agent independently re-reads
-   rows from mcxindia.com and confirms the dataset matches, including the
-   requested-date check the brief warns about.
+8. **Agent-verified data integrity.** A TinyFish web agent opens mcxindia.com in a
+   real browser and re-reads the exchange data independently of our downloaded
+   files. Three recorded checks, all passing:
+   - a valid date (17/11/2026) is served correctly;
+   - a **market holiday (02/10/2026, Gandhi Jayanti) is silently substituted** —
+     MCX returned 17 Nov 2026 data while the date input still read 02/10/2026,
+     with no message. This is exactly the failure the brief warns about, and a
+     downloaded file cannot detect it;
+   - a GOLDM row re-read live matches our stored close, volume and open interest.
+
+   Recorded in `data/verification/agent_runs.json` and replayed by
+   `src/agent_verification.py`, so the comparison is reproducible without
+   re-running the agent.
 
 ---
 
@@ -127,6 +137,7 @@ AurumSpread/
 │   ├── order_ticket.py             # Kite / Dhan 2-leg order payloads
 │   ├── hedge_optimizer.py          # Integer lot delta-neutral hedge ratios
 │   ├── data_doctor.py              # Dataset health audit
+│   ├── agent_verification.py       # Compares TinyFish agent readings vs the dataset
 │   └── copilot_engine.py           # Rule-based query responder (see note below)
 │
 ├── scripts/
@@ -135,11 +146,12 @@ AurumSpread/
 │   └── download_mcx.py             # Playwright Bhavcopy downloader
 │
 ├── data/
+│   ├── verification/               # Recorded TinyFish agent observations
 │   ├── raw/                        # Raw daily Bhavcopy CSVs (gitignored)
 │   └── processed/
 │       └── historical_gold_futures.csv   # 2,376 rows · 4 contracts · 99 sessions
 │
-└── tests/                          # 29 pytest tests (1 skipped: live MCX scrape)
+└── tests/                          # 31 pytest tests (1 skipped: live MCX scrape)
 ```
 
 **On `copilot_engine.py`:** this is a deterministic keyword-routed responder over
@@ -189,7 +201,7 @@ git clone https://github.com/shivansh189/AurumSpread.git
 cd AurumSpread
 python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-pytest                                              # 29 passed, 1 skipped
+pytest                                              # 31 passed, 1 skipped
 ```
 
 Open the site locally:
