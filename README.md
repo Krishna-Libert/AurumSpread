@@ -1,211 +1,239 @@
 # 🟡 AurumSpread
-### Commodity Derivatives Intelligence & Execution Platform for MCX Gold Futures
-**Hack in Hills '26** | **Track 03: Commodity Derivatives Intelligence** | **Final Round**
+
+### Cross-Contract Relative Value Intelligence for MCX Gold Futures
+
+**Hack in Hills '26** · **Track 03: Commodity Derivatives Intelligence** · **Final Round**
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://img.shields.io/badge/pytest-26%20passed-brightgreen.svg)]()
-[![Platform](https://img.shields.io/badge/dashboard-Streamlit-orange.svg)]()
-[![MCX Data](https://img.shields.io/badge/data-MCX%20Bhavcopy-yellow.svg)]()
+[![Tests](https://img.shields.io/badge/pytest-31%20passed-brightgreen.svg)]()
+[![Data](https://img.shields.io/badge/MCX%20Bhavcopy-99%20sessions-yellow.svg)]()
+[![Scope](https://img.shields.io/badge/universe-4%20MCX%20gold%20contracts-gold.svg)]()
+
+**Live site:** https://aurumspread.vercel.app
 
 ---
 
-## 👥 Team AurumSpread
+## What this is
 
-| Team Member | Role | Core Deliverables |
-|---|---|---|
-| **Shivansh Sahni** | Data & Python Backend | MCX Bhavcopy ingestion across 82 market dates, ₹/1g 999 gold normalization, COMEX landed parity model, and the cleaned gold futures database (1,968 rows). |
-| **Krishna Sharma** | Quant Logic & Backtesting | Day-by-day walk-forward simulator, cost-of-carry decomposition, liquidity penalty, tender lifecycle rules, exchange SPAN margin relief, and Aurum Copilot NLP rule-based engine. |
-| **Dhruv Gupta** | Frontend UI & Outreach | 5-tab institutional Streamlit dashboard, dynamic observation date scrubber, broker ticket export (Kite & Dhan), Plotly analytics, and demo presentation. |
+MCX lists the same underlying metal — gold — in four different futures contracts.
+They differ in lot size, quotation base, purity and expiry window, so their quoted
+prices are not directly comparable:
 
----
+| Contract | Trading unit | Quoted per | Purity | Expiry window |
+|---|---|---|---|---|
+| GOLDM | 100 g | 10 g | 995 | 3rd–5th |
+| GOLDTEN | 10 g | 10 g | 999 | 27th–31st |
+| GOLDGUINEA | 8 g | 8 g | 999 | 27th–31st |
+| GOLDPETAL | 1 g | 1 g | 999 | 27th–31st |
 
-## 🎯 Problem Statement & Theme Alignment
-
-In the Indian commodities market on the **Multi Commodity Exchange (MCX)**:
-- **Same Gold, Multiple Contracts**: Lot sizes, quotation bases, purities, and expiry cycles diverge across contracts (`GOLDM`, `GOLDTEN`, `GOLDGUINEA`, `GOLDPETAL`).
-- **Messy MCX Bhavcopy**: Space-padded symbols, mixed date formats (`%d %b %Y` vs `%d%b%Y`), and silent holiday gaps create false signals.
-- **The Arbitrage Mirage**: Apparent calendar spread arbitrage profits vanish once realistic exchange turnover fees, STT/CTT taxes, delivery margins, and thin liquidity haircuts are accounted for.
-- **Continuous Series Rollover Distortion**: Retail terminals (e.g. TradingView continuous contracts) stitch together contracts, introducing artificial price jumps at expiry that corrupt econometric spreads.
-- **Global vs Domestic Disconnect**: Physical gold traders and hedgers struggle to reconcile international COMEX benchmark prices (USD/oz) with Indian landed import parity (BCD + AIDC + SWC duties + USD/INR + GST).
-
-### Theme Alignment: Track 03 (Commodity Derivatives Intelligence)
-AurumSpread delivers **institutional analytical rigor over daily signals**: proving whether an apparent edge survives realistic transaction costs, providing actionable landed import parity intelligence, generating broker-ready execution tickets, and equipping traders with an interactive AI Quant Copilot.
+AurumSpread turns the public MCX Bhavcopy into a comparable ₹ per 1 gram of 999
+gold series, measures the relative pricing differences between these contracts,
+and then tests honestly whether any of those differences are tradable after real
+costs. **The headline finding is that they are mostly not** — and the project is
+built to show that rather than hide it.
 
 ---
 
-## 🚀 The 6 Core USPs (Novelty)
+## The finding
 
-1. **Contract-by-Contract Lifecycle Engine**  
-   Every contract is tracked as an independent `(Symbol, Expiry)` pair. Eliminates artificial rollover jumps and blocks new entries during illiquid and **MCX physical tender windows** (5 days pre-expiry).
-2. **Unit + Purity + Carry Normalization**  
-   Converts all gold contracts to a uniform **₹ per 1 gram of 999 purity gold**:
-   - `GOLDM` (100g): $\text{Close} \div 10 \times \frac{999}{995}$
-   - `GOLDTEN` (10g): $\text{Close} \div 10$
-   - `GOLDGUINEA` (8g): $\text{Close} \div 8$
-   - `GOLDPETAL` (1g): $\text{Close} \div 1$  
-   Separates predictable time-value roll-down from true pricing discrepancies.
-3. **Liquidity-Penalised Fill Estimator**  
-   MCX settlement price is **not** an executable price. A dynamic slippage haircut derived from Volume and Open Interest depth is applied before any trade is counted.
-4. **MCX vs COMEX Landed Import Parity Model**  
-   Converts COMEX spot/futures ($/troy oz) to Indian landed cost using live USD/INR exchange rates, statutory customs duties (5% Basic Customs Duty + 1% AIDC + 10% Social Welfare Surcharge), assessable value formulas, and 3% domestic GST. Computes the **India Gold Basis (₹/g)** to reveal true domestic premiums or discounts.
-5. **Broker Execution Ticket Generator (Kite & Dhan)**  
-   Converts viable spread opportunities into exchange-compliant 2-leg order payloads for Zerodha Kite Connect and Dhan APIs. Automatically calculates contract lot matching and factors in **~75% exchange calendar spread margin relief** on MCX SPAN margins.
-6. **Aurum Copilot (AI Quant Conversational Assistant)**  
-   An institutional chatbot capable of natural language queries on spread opportunities, physical inventory hedging (delta-neutral sizing across lot types), tender period risk warnings, COMEX import parity, and execution commands.
+The brief states that a rigorous demonstration that no persistent edge survives
+costs is a valid analytical outcome. That is what the data shows.
+
+Thresholds are tuned on an earlier window only, then applied **unchanged** to a
+later window the tuning never saw:
+
+| Split | In-sample net / trade | Out-of-sample net / trade | Trades out-of-sample |
+|---|---|---|---|
+| 15 Sep 2026 | ₹256.93 | ₹141.59 | 17 |
+| 01 Oct 2026 | ₹261.56 | −₹2.50 | 2 |
+| **15 Oct 2026** | **₹167.48** | **₹70.82 (−58%)** | 38 |
+| 01 Nov 2026 | ₹240.83 | −₹2.50 | 2 |
+
+At every split the apparent edge shrinks substantially out-of-sample, and at two
+splits the tuned thresholds barely trigger at all. On the latest session the
+quiet-alert scanner reports **zero** actionable spreads after costs.
+
+**Attribution.** Regressing daily spread P&L on the daily move of the near leg
+gives beta 0.0379 and R² 0.045 across 1,232 held days: the two legs hedge most
+of the gold move, as a calendar spread should. Of the gross P&L, roughly half is
+relative-value and half is explained by the move in the underlying — reported
+separately rather than claimed as strategy alpha.
+
+Both are reproducible: `src/validation_engine.py`, shown live in the
+**Out-of-Sample Validation** panel on the site.
 
 ---
 
-## 🖥️ The 5-Tab Trader Dashboard
+## Core capabilities
+
+1. **Contract-by-contract lifecycle.** Every contract is tracked as an
+   independent `(symbol, expiry)` pair, so there is no continuous-series
+   stitching and no artificial jump at rollover. Entries are blocked inside the
+   MCX 5-day physical tender window.
+2. **Unit + purity normalization.** `GOLDM: close ÷ 10 × 999/995`,
+   `GOLDTEN: close ÷ 10`, `GOLDGUINEA: close ÷ 8`, `GOLDPETAL: close ÷ 1`.
+3. **Cost-aware walk-forward backtest.** Day-by-day replay with no look-ahead:
+   z-scores use an expanding window of prior observations only, and a position is
+   never opened on information from the day it is evaluated.
+4. **Liquidity-penalised fills.** Settlement price is not an executable price, so
+   a slippage haircut derived from volume and open interest is applied before any
+   trade counts.
+5. **Out-of-sample validation and P&L attribution** (above).
+6. **MCX vs COMEX landed import parity.** COMEX $/oz → ₹/g landed cost using the
+   duty structure in force since 13 May 2026 (10% BCD + 5% AIDC, gold exempt from
+   SWC, 3% IGST), giving the India gold basis.
+7. **Broker-ready 2-leg order tickets.** A viable spread exports as Zerodha Kite
+   Connect and DhanHQ order payloads, or CSV.
+8. **Agent-verified data integrity.** A TinyFish web agent opens mcxindia.com in a
+   real browser and re-reads the exchange data independently of our downloaded
+   files. Four recorded checks, all passing:
+   - a valid date (17/11/2026) is served correctly;
+   - a **market holiday (02/10/2026, Gandhi Jayanti) is silently substituted** —
+     MCX returned 17 Nov 2026 data while the date input still read 02/10/2026,
+     with no message. This is exactly the failure the brief warns about, and a
+     downloaded file cannot detect it;
+   - a liquid GOLDM row and a thin far-dated GOLDPETAL row, re-read live, match
+     our stored close, volume and open interest exactly.
+
+   Recorded in `data/verification/agent_runs.json` and replayed by
+   `src/agent_verification.py`, so the comparison is reproducible without
+   re-running the agent.
+
+---
+
+## Honest limitations
+
+- **The dataset is a 99-session snapshot** (1 Jul – 17 Nov 2026). Conclusions are
+  bounded by that sample; a few months of gold spreads is a small sample for a
+  claim about persistent edge.
+- **Margin figures are estimates**, not live MCX SPAN margins. The outright and
+  calendar-offset percentages are inputs, labelled as assumptions.
+- **No live intraday feed.** MCX publishes Bhavcopy after the session closes, so
+  the dashboard is end-of-day by construction.
+- **The parity panel's COMEX and USD/INR inputs are a dated reference** for the
+  last session, editable by the user, not a streaming quote.
+- **No order is ever placed.** The ticket generator produces a payload for a human
+  to review and submit.
+
+---
+
+## Architecture
 
 ```text
 AurumSpread/
-├── 📅 Dynamic Date Scrubber          → Historical replay across 82 daily market dates
-├── Tab 1: Fair Price & Quiet Alert   → Normalized ₹/g snapshots; alerts only post-cost
-├── Tab 2: Expiry Calendar & Depth    → Lifecycle timeline, volume & OI depth, tender lockout zones
-├── Tab 3: Curves, Carry & Parity     → Term structure, carry rate, retail micro-premium & COMEX Parity
-├── Tab 4: Simulator & Order Tickets  → Walk-forward replay, "What kills the edge?", Kite/Dhan tickets
-└── Tab 5: Aurum Copilot (AI Quant)   → Conversational trade screener, physical hedge sizing & risk audit
-```
-
-### 1. Tab 1: Fair Price & Quiet Alert
-- **Multi-Contract Normalized Snapshot**: Real-time comparison of all contracts on a standardized ₹/g of 999 gold benchmark.
-- **Quiet Alert System**: Scans all active spread pairs on the selected market date. Alerts fire **only** when a post-cost executable edge ($> 0$) survives all statutory charges, slippage, and liquidity filters. Suppresses noise and false arbitrage traps.
-
-### 2. Tab 2: Expiry Calendar & Liquidity
-- **Lifecycle Timeline**: Tracks contract roll-off across calendar months.
-- **Volume & Open Interest Depth**: Visualizes liquidity concentration across near vs far expiries.
-- **Tender Delivery Exclusion Zones**: Highlights the MCX 5-day pre-expiry tender window where physical delivery allocation and margin spikes occur.
-
-### 3. Tab 3: Futures Curve, Carry & COMEX Parity
-- **Term Structure Curve**: Interactive forward curve (₹/g vs Expiry) displaying Contango / Backwardation regimes.
-- **Annualized Implied Carry Rate**: Quantifies financing cost (% p.a.) between front and deferred contracts.
-- **Retail Micro-Premium Analysis**: Tracks the structural premium that retail-sized contracts (`GOLDPETAL`, `GOLDGUINEA`) command over mini (`GOLDM`).
-- **MCX vs COMEX Import Parity**: Live calculation card displaying landed cost breakdown (Tariff, Duties, GST) and the India Basis (Domestic vs Landed Parity ₹/g) alongside an interactive historical basis timeline.
-
-### 4. Tab 4: Profit vs Fees Simulator & Broker Order Tickets
-- **Walk-Forward Simulator**: Replays calendar spread strategies without future data leakage.
-- **Overlaid Pre-Cost vs Post-Cost Equity Curves**: Shows paper profit vs realized net equity.
-- **"What Kills the Edge?" Breakeven Slider**: Automatically computes the exact cost per leg at which the strategy's net P&L drops to zero.
-- **2-Leg Execution Order Ticket**: Displays complete broker payload with 1-click JSON download for Zerodha Kite Connect and CSV download for Dhan / multi-broker terminals.
-
-### 5. Tab 5: Aurum Copilot (AI Quant)
-- **Conversational Quant Intelligence**: Interactive chat interface with pre-built prompt pills:
-  - `💡 Best Spread Today`: Identifies the top executable spread opportunity after costs.
-  - `🛡️ Hedge 250g Gold`: Computes exact integer lot-hedging combinations across contracts with delta mismatch analysis.
-  - `🌐 COMEX Import Basis`: Explains current domestic parity, tariff duties, and whether gold is trading at an import premium or discount.
-  - `⚠️ Tender Window Risk`: Flags contracts in or approaching the 5-day physical delivery tender window.
-- **Natural Language Parsing**: Type custom questions (e.g., *"How do I hedge 250g of gold with mini contracts?"*, *"Give me the broker order ticket for GOLDM"*, *"Why is there a tender lockout?"*).
-
----
-
-## 🌟 Stretch Features Highlighted in Presentation
-
-- **📐 Lot-Size Hedge Ratio Optimizer**: Calculates exact delta-neutral integer lot ratios between mismatched contracts (e.g. 1 GOLDM 100g = 10 GOLDTEN = 12.5 GOLDGUINEA = 100 GOLDPETAL).
-- **🩺 MCX Data Doctor**: Automated Bhavcopy integrity audit checking symbol padding, ISO date formatting, holiday continuity, zero volumes, and contract lifecycle ordering (100/100 score).
-- **🏷️ Retail Micro-Premium Heatmap**: Quantifies retail convenience markups over wholesale mini contracts.
-- **⚡ Calendar Spread Margin Relief**: Integrates MCX's ~75% margin discount on matched calendar spreads into risk & capital allocation.
-
----
-
-## 🥊 What Exists Today vs AurumSpread
-
-| Capability | Retail Terminals (Zerodha, Groww) | Charting (TradingView) | Derivatives Portals (Sensibull) | Institutional (Bloomberg) | **AurumSpread** |
-|---|---|---|---|---|---|
-| **Purity & Unit Normalization** | ❌ Raw quote only | ❌ None | ❌ None | ⚠️ Manual formula | ✅ **Automated (995 to 999 ₹/g)** |
-| **No Rollover Discontinuity** | ❌ Rollover jumps | ❌ Continuous jumps | ❌ None | ⚠️ Manual roll rules | ✅ **Contract-by-contract lifecycle** |
-| **MCX Tender Period Lockout** | ❌ None | ❌ None | ❌ None | ❌ Custom setup | ✅ **Automated 5-day tender lockout** |
-| **Dynamic Liquidity Haircut** | ❌ Uses settlement px | ❌ None | ❌ None | ⚠️ Static bid-ask | ✅ **Dynamic Volume/OI haircut** |
-| **Quiet Alert Noise Suppression** | ❌ Raw price alerts | ❌ Indicator noise | ❌ None | ❌ High false-alarm rate | ✅ **Post-cost survival alerts only** |
-| **COMEX Landed Import Parity** | ❌ None | ❌ Raw ratio only | ❌ None | ⚠️ Custom pricing sheet | ✅ **Full Duty + GST Landed Parity** |
-| **Broker-Ready 2-Leg Ticket** | ❌ Single leg only | ❌ None | ⚠️ Equity/Index only | ❌ Terminal only | ✅ **Kite & Dhan 2-Leg Spread Tickets** |
-| **Conversational AI Quant** | ❌ Generic helpdesk | ❌ None | ❌ None | ⚠️ BloombergGPT | ✅ **Aurum Copilot (Commodity Native)** |
-| **Cost** | Free (Brokered) | \$15–\$60/mo | \$10–\$25/mo | \$24,000+/year | ✅ **Open-Source Quant Prototype** |
-
----
-
-## 🛠️ Technology Stack & Architecture
-
-- **Language & Runtime**: Python 3.10+
-- **Analytics & Quants**: Pandas, NumPy
-- **Interactive UI**: Streamlit
-- **Visualizations**: Plotly Express & Plotly Graph Objects
-- **Test Automation**: Pytest (26 unit & integration tests, 100% passing)
-- **Data Source**: Official MCX Bhavcopy (public daily exchange data across 82 market sessions)
-
-```text
-AurumSpread/
-├── app.py                         # 5-Tab Institutional Streamlit Dashboard
-├── requirements.txt               # Project dependencies
-├── pytest.ini                     # Pytest configuration
+├── landing_page/index.html         # The product: single-page analytics site (Vercel)
+├── app.py                          # Streamlit dashboard over the same engines
 │
-├── src/                           # Core Analytical Engines
-│   ├── normalize.py               # Unit & 999 purity normalization
-│   ├── spread_engine.py           # Calendar spread pair generator
-│   ├── spread_intelligence.py     # Expanding-window Z-score & percentiles
-│   ├── carry_engine.py            # Forward curve, annualized carry & micro-premium
-│   ├── liquidity_engine.py        # Volume/OI depth, tender lockout, dynamic slippage
-│   ├── backtest_engine.py         # Walk-forward backtester & survival proof
-│   ├── quiet_alerts.py            # Quiet alert scanner & noise suppression
-│   ├── hedge_optimizer.py         # Lot-size integer delta hedge optimizer
-│   ├── data_doctor.py             # Automated Bhavcopy health auditor
-│   ├── parity_engine.py           # COMEX Landed Import Parity & India Basis
-│   ├── order_ticket.py            # Kite Connect & Dhan 2-leg order tickets
-│   └── copilot_engine.py          # Aurum Copilot conversational quant intelligence
+├── src/                            # Analytical engines (pure functions over DataFrames)
+│   ├── ingest.py                   # Bhavcopy loading, symbol trimming, date validation
+│   ├── normalize.py                # Contract specs + unit/purity normalization
+│   ├── spread_engine.py            # Calendar spread pair construction
+│   ├── spread_intelligence.py      # Expanding-window mean, std, percentile, z-score
+│   ├── backtest_engine.py          # Walk-forward replay, costs, breakeven search
+│   ├── validation_engine.py        # Out-of-sample validation + P&L attribution
+│   ├── carry_engine.py             # Term structure, implied carry, micro-premium
+│   ├── liquidity_engine.py         # Depth, tender lockout, slippage estimation
+│   ├── quiet_alerts.py             # Post-cost alert scanner with suppression audit
+│   ├── parity_engine.py            # COMEX landed import parity and India basis
+│   ├── order_ticket.py             # Kite / Dhan 2-leg order payloads
+│   ├── hedge_optimizer.py          # Integer lot delta-neutral hedge ratios
+│   ├── data_doctor.py              # Dataset health audit
+│   ├── agent_verification.py       # Compares TinyFish agent readings vs the dataset
+│   └── copilot_engine.py           # Rule-based query responder (see note below)
+│
+├── scripts/
+│   ├── build_expanded_dataset.py   # Raw Bhavcopy CSVs → historical_gold_futures.csv
+│   ├── build_site_data.py          # Rebuilds the site's embedded DATA from the dataset
+│   └── download_mcx.py             # Playwright Bhavcopy downloader
 │
 ├── data/
-│   ├── raw/                       # Raw daily Bhavcopy CSVs (gitignored; rebuild with scripts/download_mcx.py)
-│   └── processed/                 # Cleaned datasets
-│       └── historical_gold_futures.csv     # 4 Gold contracts (1,968 records)
+│   ├── verification/               # Recorded TinyFish agent observations
+│   ├── raw/                        # Raw daily Bhavcopy CSVs (gitignored)
+│   └── processed/
+│       └── historical_gold_futures.csv   # 2,376 rows · 4 contracts · 99 sessions
 │
-├── scripts/                       # Data download, inspection and dataset builders
-│   └── build_expanded_dataset.py   # Gold futures dataset builder
-│
-└── tests/                         # 26 automated pytest test cases
-    └── test_*.py                  # backtest, spreads, ingest, leakage, new engines
+└── tests/                          # 31 pytest tests (1 skipped: live MCX scrape)
 ```
+
+**On `copilot_engine.py`:** this is a deterministic keyword-routed responder over
+the same engines, not a language model. It is described that way deliberately.
+The project's AI component is the TinyFish web agent used for data verification.
 
 ---
 
-## ⚡ Quickstart & Installation
+## Data pipeline
 
-### 1. Clone the repository & create virtual environment
+```text
+MCX Bhavcopy CSV  →  ingest/normalize  →  historical_gold_futures.csv
+                                               │
+                        ┌──────────────────────┼──────────────────────┐
+                        ▼                      ▼                      ▼
+                 spread_engine         carry/liquidity          data_doctor
+                        │                      │                      │
+                 spread_intelligence           │                      │
+                        │                      │                      │
+            backtest + validation ─────────────┴──────────────────────┘
+                        │
+            scripts/build_site_data.py  →  landing_page/index.html
+```
+
+The site is static: `build_site_data.py` recomputes every figure from the CSV with
+the same Python engines and writes them into the page, so the website and the
+backend can never disagree. The site's in-browser backtest was verified against
+the Python engine across 4,320 parameter combinations with zero mismatches.
+
+### Data considerations handled
+
+- **Requested-date validation.** MCX returns the most recent available trading day
+  for an unrecognised, holiday, malformed or future date. The TinyFish agent
+  checks the displayed date against the requested one.
+- **Symbol padding and mixed date formats** (`04DEC2026` vs `04 Dec 2026`) are
+  normalised on ingest.
+- **Special sessions.** The dataset includes the Diwali Muhurat session of Sunday
+  8 Nov 2026; without it, 9 Nov previous-closes do not reconcile.
+- **Expiry-keyed tracking,** never a continuous near-month series.
+
+---
+
+## Quickstart
+
 ```bash
 git clone https://github.com/shivansh189/AurumSpread.git
 cd AurumSpread
-python -m venv .venv
-```
-
-Activate environment:
-- **Windows**: `.venv\Scripts\activate`
-- **Linux / macOS**: `source .venv/bin/activate`
-
-### 2. Install dependencies
-```bash
+python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+pytest                                              # 31 passed, 1 skipped
 ```
 
-### 3. Run the automated test suite
+Open the site locally:
+
 ```bash
-pytest
+open landing_page/index.html        # or just visit https://aurumspread.vercel.app
 ```
-*Expected result: 26 passed, 1 skipped (0 failures).*
 
-### 4. Launch the Streamlit dashboard
+Rebuild the site's data after adding Bhavcopy files:
+
+```bash
+python scripts/build_expanded_dataset.py   # raw CSVs → dataset
+python scripts/build_site_data.py          # dataset → site
+```
+
+Run the Streamlit dashboard over the same engines:
+
 ```bash
 streamlit run app.py
 ```
-Open your browser at `http://localhost:8501`.
 
 ---
 
-## 🏆 Hackathon Submission Checklist (Final Round)
+## Team
 
-- [x] **Track 03 Alignment**: Rigorous commodity derivatives intelligence with cost-of-carry and walk-forward backtesting.
-- [x] **6 Core USPs Implemented**: Contract lifecycle, unit+purity normalization, liquidity-penalised fill, honest survival proof, COMEX landed parity, and 2-leg broker tickets.
-- [x] **5-Tab Trader Dashboard**: Intuitive institutional UI with dynamic date replay, interactive Plotly visuals, and zero raw code leaks.
-- [x] **Aurum Copilot AI**: Interactive Quant Assistant with prompt chips and conversational hedging/pricing intelligence.
-- [x] **100% Passing Test Suite**: 26 automated pytest tests verifying data integrity, quant models, and zero future data leakage.
-- [x] **Production Ready**: Verified against 82 MCX Bhavcopy sessions with Kite Connect / Dhan integration export.
+| Member | Role |
+|---|---|
+| **Shivansh Sahni** | Data & Python backend — Bhavcopy ingestion, normalization, COMEX parity model |
+| **Krishna Sharma** | Quant logic & backtesting — walk-forward simulator, cost model, tender lifecycle, out-of-sample validation |
+| **Dhruv Gupta** | Frontend & outreach — analytics site, visualisations, demo |
 
 ---
-*Built with ❤️ for **Hack in Hills '26** by Team AurumSpread.*
+
+*Built for **Hack in Hills '26**, Track 03.*
