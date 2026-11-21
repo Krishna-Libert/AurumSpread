@@ -5652,6 +5652,18 @@
         .ab-msg b { color: #8A6A10; }
         .ab-bot b { color: #8A6A10; }
         .ab-you b { color: #F5C542; }
+        .ab-typing { display: inline-flex; gap: 5px; align-items: center; padding: 13px 14px; }
+        .ab-typing span {
+            width: 6px; height: 6px; border-radius: 50%; background: #C59B27;
+            opacity: .32; animation: abBounce 1s infinite ease-in-out;
+        }
+        .ab-typing span:nth-child(2) { animation-delay: .15s; }
+        .ab-typing span:nth-child(3) { animation-delay: .30s; }
+        @keyframes abBounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: .30; }
+            30%           { transform: translateY(-4px); opacity: .95; }
+        }
+        @media (prefers-reduced-motion: reduce) { .ab-typing span { animation: none; } }
         #ab-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; flex: 0 0 auto; }
         .ab-chip { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .06em;
             text-transform: uppercase; padding: 5px 9px; border-radius: 999px; cursor: pointer;
@@ -5835,24 +5847,47 @@
             [/price|fair|value|quote|how much|cost of gold|rate/, ansPrice]
         ];
 
+        var busy = false;
+
+        function answerFor(s) {
+            for (var i = 0; i < ROUTES.length; i++) {
+                if (ROUTES[i][0].test(s)) {
+                    try { return ROUTES[i][1](s); }
+                    catch (e) { return 'I could not read that figure from the page.'; }
+                }
+            }
+            return 'I did not catch that one. I can cover price, alerts, carry, import parity, out-of-sample validation, attribution, liquidity, the tender window, data quality, contract specs and how the data was verified.<br><br>Type <b>help</b> for the full list.';
+        }
+
         function respond(q) {
             var s = q.toLowerCase().trim();
             if (!s) return;
-            for (var i = 0; i < ROUTES.length; i++) {
-                if (ROUTES[i][0].test(s)) { try { return say(ROUTES[i][1](s)); } catch (e) { return say('I could not read that figure from the page.'); } }
-            }
-            say('I did not catch that one. I can cover price, alerts, carry, import parity, out-of-sample validation, attribution, liquidity, the tender window, data quality, contract specs and how the data was verified.<br><br>Type <b>help</b> for the full list.');
+            busy = true;
+            // The answer is computed immediately; the pause is purely so the reply
+            // does not appear in the same frame as the question, which reads as a
+            // canned dump rather than a response.
+            var html = answerFor(s);
+            var dots = document.createElement('div');
+            dots.className = 'ab-msg ab-bot ab-typing';
+            dots.innerHTML = '<span></span><span></span><span></span>';
+            log.appendChild(dots); log.scrollTop = log.scrollHeight;
+            setTimeout(function () {
+                if (dots.parentNode) dots.parentNode.removeChild(dots);
+                say(html);
+                busy = false;
+            }, 430 + Math.random() * 340);
         }
 
         CHIPS.forEach(function (c) {
             var b = document.createElement('button');
             b.type = 'button'; b.className = 'ab-chip'; b.textContent = c;
-            b.onclick = function () { say(c, 'you'); respond(c); };
+            b.onclick = function () { if (busy) return; say(c, 'you'); respond(c); };
             chipBar.appendChild(b);
         });
 
         document.getElementById('ab-form').addEventListener('submit', function (e) {
             e.preventDefault();
+            if (busy) return;
             var inp = document.getElementById('ab-in'), q = inp.value;
             if (!q.trim()) return;
             say(q.replace(/[<>]/g, ''), 'you'); inp.value = ''; respond(q);
