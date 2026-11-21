@@ -5599,5 +5599,283 @@
         initValidation();
         renderAgentVerification();
     </script>
+
+    <!-- =====================================================================
+         ASK AURUM - small rule-based helper.
+         Reads the page's own embedded DATA object. No backend, no API key,
+         no language model: every answer is routed by keyword to a function
+         that formats real numbers already on this page.
+         ===================================================================== -->
+    <style>
+        #ab-launch {
+            position: fixed; right: 26px; bottom: 26px; z-index: 55;
+            display: inline-flex; align-items: center; gap: 9px;
+            padding: 11px 17px; border-radius: 999px; cursor: pointer;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+            color: #2A1F04; background: linear-gradient(135deg, #F5C542 0%, #C59B27 100%);
+            border: 1px solid rgba(197,155,39,0.55);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.26);
+            transition: transform .18s ease, box-shadow .18s ease;
+        }
+        #ab-launch:hover { transform: translateY(-2px); box-shadow: 0 14px 38px rgba(0,0,0,0.32); }
+        body.is-loading #ab-launch { display: none; }
+        #ab-panel {
+            position: fixed; right: 26px; bottom: 26px; z-index: 56;
+            width: 372px; max-width: calc(100vw - 32px);
+            height: 520px; max-height: calc(100vh - 120px);
+            display: none; flex-direction: column; overflow: hidden;
+            border-radius: 14px; background: #FBFAF7;
+            border: 1px solid rgba(197,155,39,0.42);
+            box-shadow: 0 26px 70px rgba(2,24,97,0.26);
+            font-family: 'Onest', sans-serif;
+        }
+        #ab-panel.ab-open { display: flex; }
+        #ab-head {
+            padding: 13px 15px; background: linear-gradient(135deg, #021861 0%, #0A2B8A 100%);
+            color: #fff; flex: 0 0 auto;
+        }
+        #ab-head h4 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
+        #ab-head p { margin: 3px 0 0; font-size: 9.5px; letter-spacing: .1em;
+            text-transform: uppercase; color: rgba(255,255,255,0.62);
+            font-family: 'JetBrains Mono', monospace; }
+        #ab-close { position: absolute; top: 11px; right: 12px; cursor: pointer;
+            color: rgba(255,255,255,0.75); font-size: 17px; line-height: 1; background: none; border: 0; }
+        #ab-log { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px;
+            display: flex; flex-direction: column; gap: 10px;
+            scrollbar-width: thin; scrollbar-color: rgba(197,155,39,0.45) transparent; }
+        #ab-log::-webkit-scrollbar { width: 6px; }
+        #ab-log::-webkit-scrollbar-thumb { background: rgba(197,155,39,0.4); border-radius: 3px; }
+        .ab-msg { font-size: 12.5px; line-height: 1.62; padding: 10px 12px; border-radius: 10px; max-width: 94%; }
+        .ab-bot { background: #fff; border: 1px solid rgba(2,24,97,0.10); color: #1A2238; align-self: flex-start; }
+        .ab-you { background: #021861; color: #fff; align-self: flex-end; }
+        .ab-msg b { color: #8A6A10; }
+        .ab-bot b { color: #8A6A10; }
+        .ab-you b { color: #F5C542; }
+        #ab-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; flex: 0 0 auto; }
+        .ab-chip { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; letter-spacing: .06em;
+            text-transform: uppercase; padding: 5px 9px; border-radius: 999px; cursor: pointer;
+            background: rgba(197,155,39,0.10); border: 1px solid rgba(197,155,39,0.38); color: #7A5E10; }
+        .ab-chip:hover { background: rgba(197,155,39,0.22); }
+        #ab-form { display: flex; gap: 8px; padding: 11px 13px; border-top: 1px solid rgba(2,24,97,0.09);
+            background: #fff; flex: 0 0 auto; }
+        #ab-in { flex: 1; border: 1px solid rgba(2,24,97,0.16); border-radius: 8px;
+            padding: 9px 11px; font-size: 12.5px; font-family: 'Onest', sans-serif; outline: none; color: #1A2238; }
+        #ab-in:focus { border-color: #C59B27; }
+        #ab-send { border: 0; border-radius: 8px; padding: 0 15px; cursor: pointer;
+            background: linear-gradient(135deg, #F5C542 0%, #C59B27 100%); color: #2A1F04;
+            font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+        @media (max-width: 480px) { #ab-panel { right: 12px; left: 12px; width: auto; height: 70vh; } }
+    </style>
+
+    <button id="ab-launch" aria-label="Open the AurumSpread assistant">
+        <span style="font-size:13px;line-height:1">&#9679;</span> Ask Aurum
+    </button>
+
+    <div id="ab-panel" role="dialog" aria-label="AurumSpread assistant">
+        <div id="ab-head">
+            <h4>AurumSpread Assistant</h4>
+            <p>Rule-based &middot; reads this page's data &middot; not a language model</p>
+            <button id="ab-close" aria-label="Close">&times;</button>
+        </div>
+        <div id="ab-log"></div>
+        <div id="ab-chips"></div>
+        <form id="ab-form" autocomplete="off">
+            <input id="ab-in" type="text" placeholder="Ask about price, carry, alerts, parity&hellip;">
+            <button id="ab-send" type="submit">ASK</button>
+        </form>
+    </div>
+
+    <script>
+    (function () {
+        if (typeof DATA === 'undefined') return;          // page data missing: stay silent
+        var log = document.getElementById('ab-log');
+        var chipBar = document.getElementById('ab-chips');
+
+        // Six only: more rows of chips squeeze the answer area. 'help' lists the rest.
+        var CHIPS = ['Fair price of GOLDM', 'Any alerts today?', 'Cost of carry',
+                     'Import parity', 'Out-of-sample result', 'How was data verified?'];
+
+        function money(n, d) { return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: d === undefined ? 2 : d, maximumFractionDigits: d === undefined ? 2 : d }); }
+        function say(html, who) {
+            var el = document.createElement('div');
+            el.className = 'ab-msg ' + (who === 'you' ? 'ab-you' : 'ab-bot');
+            el.innerHTML = html; log.appendChild(el); log.scrollTop = log.scrollHeight;
+        }
+        function symbolIn(q) {
+            if (/petal/.test(q)) return 'GOLDPETAL';
+            if (/guinea/.test(q)) return 'GOLDGUINEA';
+            if (/goldten|gold ten|\b10\s?g\b/.test(q)) return 'GOLDTEN';
+            if (/goldm|gold m|\b100\s?g\b/.test(q)) return 'GOLDM';
+            return null;
+        }
+        function front(sym) {
+            var r = (DATA.latest_records || []).filter(function (x) { return x.symbol === sym; });
+            return r.length ? r[0] : null;
+        }
+
+        // ---- intent handlers: each returns an HTML string built from DATA ----
+        function ansPrice(q) {
+            var sym = symbolIn(q) || 'GOLDM', f = front(sym);
+            if (!f) return 'I do not have a record for that contract.';
+            var all = (DATA.latest_records || []).filter(function (x) { return x.symbol === sym; });
+            var lines = all.slice(0, 4).map(function (r) {
+                return '&bull; ' + r.expiry_date + ' &mdash; quoted ' + money(r.close, 0) + ', normalized <b>' + money(r.norm_price) + '/g</b>';
+            }).join('<br>');
+            return '<b>' + sym + '</b> on ' + DATA.latest_date + ':<br>' + lines +
+                '<br><br>Normalized means ₹ per 1 gram of 999-fine gold, so it is comparable across all four contracts.';
+        }
+        function ansAlerts() {
+            var raw = DATA.quiet_alerts_raw || [];
+            var top = raw.slice().sort(function (a, b) { return Math.abs(b.zscore) - Math.abs(a.zscore); })[0];
+            return 'On ' + DATA.latest_date + ' the scanner looked at <b>' + raw.length + ' expiry pairs</b> and raised <b>0 actionable alerts</b>.<br><br>' +
+                'The widest was ' + top.symbol + ' ' + top.near_expiry + ' → ' + top.far_expiry +
+                ' at z = <b>' + top.zscore.toFixed(2) + '</b>, a gross edge of ' + money(top.gross_edge) + '/g.<br><br>' +
+                'That does not survive round-trip fees, slippage and the tender lockout, so it stays quiet. The scanner is built to say nothing most days.';
+        }
+        function ansCarry(q) {
+            var sym = symbolIn(q) || 'GOLDM', c = (DATA.curves || {})[sym] || [];
+            var pts = c.filter(function (x) { return x.carry_pct; }).slice(0, 4).map(function (x) {
+                return '&bull; ' + x.expiry + ' &mdash; <b>' + x.carry_pct.toFixed(2) + '% p.a.</b> (' + x.regime + ')';
+            }).join('<br>');
+            return '<b>' + sym + '</b> implied cost of carry:<br>' + pts +
+                '<br><br>The curve is in contango, so far months trade above near months. That is the predictable part of a spread, and it is stripped out before any signal is measured.';
+        }
+        function ansParity() {
+            var ref = DATA.parity_ref || {};
+            var v = function (id) { var e = document.getElementById(id); return e ? parseFloat(e.value) || 0 : 0; };
+            var bcd = v('par-bcd') || 10, aidc = v('par-aidc') || 5, gst = v('par-gst') || 3, handling = v('par-handling') || 0;
+            // Mirrors calcParity() exactly: MCX futures are quoted ex-GST, so the
+            // basis is measured against the ex-GST landed price, not the incl-GST one.
+            var cif = ref.comex_usd_per_oz / 31.1034768 * ref.usdinr;
+            var exGst = cif + cif * bcd / 100 + cif * aidc / 100 + handling;
+            var incGst = exGst * (1 + gst / 100);
+            var recs = (DATA.latest_records || []).filter(function (r) { return r.symbol === 'GOLDM' || r.symbol === 'GOLDTEN'; });
+            var mcx = recs.reduce(function (a, r) { return a + r.norm_price; }, 0) / recs.length;
+            var diff = mcx - exGst, pct = diff / exGst * 100;
+            return 'COMEX <b>$' + ref.comex_usd_per_oz + '/oz</b> at <b>' + ref.usdinr + '</b> USD/INR, on ' + ref.date + '.<br><br>' +
+                'Landed after ' + bcd + '% customs + ' + aidc + '% AIDC, ex-GST: <b>' + money(exGst) + '/g</b><br>' +
+                '(with ' + gst + '% IGST it would be ' + money(incGst) + '/g)<br>' +
+                'MCX, GOLDM + GOLDTEN average: <b>' + money(mcx) + '/g</b><br><br>' +
+                'India basis: <b>' + (diff >= 0 ? '+' : '') + money(diff) + '/g (' + pct.toFixed(2) + '%)</b> ' +
+                (diff >= 0 ? 'above' : 'below') + ' landed parity.<br><br>' +
+                'MCX futures are quoted ex-GST, so the comparison is against the ex-GST landed price. Since the May 2026 duty rise, domestic prices sit structurally above landed cost.';
+        }
+        function ansValidation() {
+            var v = (DATA.validation || {})['2026-10-15']; if (!v) return 'No validation run is loaded.';
+            var i = v.in_sample, o = v.out_sample || v.out_of_sample || {};
+            var splits = Object.keys(DATA.validation).map(function (k) {
+                var s = DATA.validation[k], oo = s.out_sample || s.out_of_sample || {};
+                return '&bull; ' + k + ' &mdash; in ' + money(s.in_sample.net_per_trade) + ' &rarr; out <b>' + money(oo.net_per_trade || 0) + '</b>';
+            }).join('<br>');
+            return 'Thresholds are tuned on the earlier window only, then applied unchanged to data the tuning never saw.<br><br>' +
+                'At the <b>15 Oct</b> split: in-sample ' + money(i.net_per_trade) + ' per trade over ' + i.trades + ' trades, out-of-sample <b>' + money(o.net_per_trade || 0) + '</b>.<br><br>' +
+                'All four splits:<br>' + splits +
+                '<br><br>At two of them the tuned thresholds barely trigger and lose money. The in-sample number was selection bias.';
+        }
+        function ansAttribution() {
+            var a = DATA.attribution || {};
+            return 'Daily spread P&amp;L regressed on the near leg’s move, over <b>' + a.observations + '</b> held days:<br><br>' +
+                '&bull; beta <b>' + a.beta + '</b><br>&bull; R² <b>' + a.r_squared + '</b><br>' +
+                '&bull; directional share <b>' + Number(a.directional_share_pct).toFixed(1) + '%</b><br><br>' +
+                'A beta near zero is what a calendar spread should show: the two legs hedge most of the gold move. So roughly half the gross P&amp;L is relative value and half is the underlying, and we report them separately instead of calling it all alpha.';
+        }
+        function ansAudit() {
+            var a = DATA.audit || {};
+            var checks = (a.diagnostics || []).map(function (d) { return '&bull; ' + d.check + ' &mdash; <b>' + d.status + '</b>'; }).join('<br>');
+            return 'Data Doctor score: <b>' + a.health_score + '/100</b> (' + a.status + ').<br><br>' +
+                a.total_rows + ' rows &middot; ' + a.unique_symbols + ' contracts &middot; ' + a.trading_days + ' trading sessions.<br><br>' + checks;
+        }
+        function ansSpecs() {
+            return 'The four contracts quote the same metal differently:<br><br>' +
+                '&bull; <b>GOLDM</b> &mdash; 100 g lot, quoted per 10 g, <b>995</b> purity<br>' +
+                '&bull; <b>GOLDTEN</b> &mdash; 10 g lot, quoted per 10 g, 999<br>' +
+                '&bull; <b>GOLDGUINEA</b> &mdash; 8 g lot, quoted per 8 g, 999<br>' +
+                '&bull; <b>GOLDPETAL</b> &mdash; 1 g lot, quoted per 1 g, 999<br><br>' +
+                'To compare them: GOLDM &divide; 10 &times; (999/995), GOLDTEN &divide; 10, GUINEA &divide; 8, PETAL &divide; 1.<br><br>' +
+                'The purity step matters. Skip it and you invent a ~0.4% difference that is not real.';
+        }
+        function ansLiquidity() {
+            var l = (DATA.liquidity || []).slice().sort(function (a, b) { return b.volume - a.volume; }).slice(0, 4);
+            var rows = l.map(function (x) {
+                return '&bull; <b>' + x.symbol + '</b> ' + x.expiry + ' &mdash; ' + x.volume.toLocaleString('en-IN') + ' lots, OI ' + x.oi.toLocaleString('en-IN') + ' (' + x.tier + ')';
+            }).join('<br>');
+            return 'Deepest contracts on ' + DATA.latest_date + ':<br>' + rows +
+                '<br><br>Depth drives the slippage haircut, so a thin far-dated contract is penalised far harder than a front-month one.';
+        }
+        function ansAgent() {
+            var g = DATA.agent_verification || {}, ch = g.checks || [];
+            var rows = ch.map(function (c) { return '&bull; ' + c.label + ' &mdash; <b>' + (c.passed ? 'PASS' : 'FAIL') + '</b>'; }).join('<br>');
+            return 'A TinyFish web agent opens mcxindia.com in a real browser and re-reads the exchange data, independently of our downloaded files.<br><br>' + rows +
+                '<br><br>The notable one: we requested <b>02/10/2026</b>, Gandhi Jayanti, a market holiday. MCX returned 17 Nov data with the date box unchanged and no warning. A downloaded file cannot detect that.';
+        }
+        function ansTender() {
+            return 'MCX contracts enter a <b>5-day physical tender window</b> before expiry, where you can be assigned actual metal.<br><br>' +
+                'The backtest blocks any new entry inside that window, and the order ticket carries a tender warning. It is an MCX-specific rule that generic tools do not model.';
+        }
+        function ansHelp() {
+            return 'I answer from the numbers already on this page. Try:<br><br>' +
+                '&bull; fair price of GOLDTEN<br>&bull; any alerts today<br>&bull; cost of carry<br>&bull; import parity<br>' +
+                '&bull; out-of-sample result<br>&bull; attribution / beta<br>&bull; data quality<br>&bull; GOLDM vs GOLDPETAL<br>' +
+                '&bull; most liquid contract<br>&bull; how was the data verified<br>&bull; what is the tender window';
+        }
+
+        var ROUTES = [
+            [/help|what can you|what do you|how do i use/, ansHelp],
+            [/tinyfish|agent|verif|holiday|gandhi|scrape/, ansAgent],
+            [/out.?of.?sample|validat|decay|overfit|unseen|split/, ansValidation],
+            [/attribut|beta|r2|r\^2|r squared|directional|alpha/, ansAttribution],
+            [/parity|comex|import|landed|basis|duty|customs|aidc|usdinr/, ansParity],
+            [/carry|contango|curve|term structure|roll/, ansCarry],
+            [/alert|signal|opportunit|trade today|anything to trade|scanner/, ansAlerts],
+            [/liquid|volume|open interest|\boi\b|depth|turnover/, ansLiquidity],
+            [/tender|delivery|physical|assign/, ansTender],
+            [/audit|data quality|doctor|health|how many rows|sessions|dataset/, ansAudit],
+            [/spec|purity|lot size|difference|vs|995|999|normali[sz]/, ansSpecs],
+            [/price|fair|value|quote|how much|cost of gold|rate/, ansPrice]
+        ];
+
+        function respond(q) {
+            var s = q.toLowerCase().trim();
+            if (!s) return;
+            for (var i = 0; i < ROUTES.length; i++) {
+                if (ROUTES[i][0].test(s)) { try { return say(ROUTES[i][1](s)); } catch (e) { return say('I could not read that figure from the page.'); } }
+            }
+            say('I did not catch that one. I can cover price, alerts, carry, import parity, out-of-sample validation, attribution, liquidity, the tender window, data quality, contract specs and how the data was verified.<br><br>Type <b>help</b> for the full list.');
+        }
+
+        CHIPS.forEach(function (c) {
+            var b = document.createElement('button');
+            b.type = 'button'; b.className = 'ab-chip'; b.textContent = c;
+            b.onclick = function () { say(c, 'you'); respond(c); };
+            chipBar.appendChild(b);
+        });
+
+        document.getElementById('ab-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var inp = document.getElementById('ab-in'), q = inp.value;
+            if (!q.trim()) return;
+            say(q.replace(/[<>]/g, ''), 'you'); inp.value = ''; respond(q);
+        });
+        document.getElementById('ab-launch').onclick = function () {
+            document.getElementById('ab-panel').classList.add('ab-open');
+            this.style.display = 'none';
+            if (!log.children.length) {
+                say('I answer from this page’s own data — ' + DATA.audit.trading_days + ' MCX sessions to ' + DATA.latest_date + '.<br><br>Pick a question below, or ask your own.');
+            }
+            document.getElementById('ab-in').focus();
+        };
+        document.getElementById('ab-close').onclick = function () {
+            document.getElementById('ab-panel').classList.remove('ab-open');
+            document.getElementById('ab-launch').style.display = 'inline-flex';
+        };
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && document.getElementById('ab-panel').classList.contains('ab-open')) {
+                document.getElementById('ab-close').click();
+            }
+        });
+    })();
+    </script>
+
 </body>
 </html>
