@@ -1783,6 +1783,34 @@
                             <input id="ctrl-lots" type="range" min="1" max="25" step="1" value="1" oninput="onControlChange()" class="w-full accent-teal cursor-pointer">
                         </div>
                     </div>
+
+                    <!-- Live effect readout. The sliders drive the Quiet Alert
+                         Scanner in Tab 1 and the walk-forward simulator in Tab 4,
+                         both of which are far down the page, so without this strip
+                         a slider move produces no visible feedback at all. -->
+                    <div class="mt-5 pt-5 border-t border-navy/10 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <div class="font-mono text-[10px] uppercase tracking-[0.18em] text-navy/50 mb-1">Live effect // Tab 01 scanner</div>
+                            <div class="flex items-baseline gap-2">
+                                <span id="dock-alerts" class="font-mono text-2xl font-bold text-navy">—</span>
+                                <span id="dock-alerts-sub" class="font-mono text-xs text-navy/55">active alerts</span>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="font-mono text-[10px] uppercase tracking-[0.18em] text-navy/50 mb-1">Live effect // Tab 04 simulator</div>
+                            <div class="flex items-baseline gap-2">
+                                <span id="dock-net" class="font-mono text-2xl font-bold text-navy">—</span>
+                                <span id="dock-net-sub" class="font-mono text-xs text-navy/55">net P&amp;L</span>
+                            </div>
+                        </div>
+                        <div class="sm:text-right">
+                            <div class="font-mono text-[10px] uppercase tracking-[0.18em] text-navy/50 mb-1">Suppressed by friction</div>
+                            <div class="flex sm:justify-end items-baseline gap-2">
+                                <span id="dock-suppressed" class="font-mono text-2xl font-bold text-navy/70">—</span>
+                                <span class="font-mono text-xs text-navy/55">of <span id="dock-raw">—</span> raw triggers</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -5048,6 +5076,17 @@
             document.getElementById('qa-tender').textContent = tenderCount;
             document.getElementById('qa-cost').textContent = costCount;
             document.getElementById('qa-active').textContent = activeCount;
+            // mirror into the Friction Dock readout at the top of the page
+            (function () {
+                var a = document.getElementById('dock-alerts');
+                if (!a) return;
+                a.textContent = activeCount;
+                a.style.color = activeCount > 0 ? '#C59B27' : '#021861';
+                document.getElementById('dock-alerts-sub').textContent =
+                    'of ' + DATA.quiet_alerts_raw.length + ' pairs';
+                document.getElementById('dock-suppressed').textContent = tenderCount + costCount;
+                document.getElementById('dock-raw').textContent = rawCount;
+            })();
             document.getElementById('qa-table-body').innerHTML = rowsHtml;
 
             // Render active alert cards at top
@@ -5232,6 +5271,19 @@
             document.getElementById('bt-trades').textContent = res.trades;
             document.getElementById('bt-winrate').textContent = `${res.winRate.toFixed(1)}%`;
             document.getElementById('bt-breakeven').textContent = `₹${beCost.toFixed(1)}/leg`;
+            (function () {
+                var n = document.getElementById('dock-net');
+                if (!n) return;
+                if (!res.trades) {                       // no expiry pair chosen yet in Tab 04
+                    n.textContent = '—'; n.style.color = '#021861';
+                    document.getElementById('dock-net-sub').textContent = 'pick a pair in Tab 04';
+                    return;
+                }
+                n.textContent = '₹' + res.cumNet.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+                n.style.color = res.cumNet >= 0 ? '#021861' : '#B4342B';
+                document.getElementById('dock-net-sub').textContent =
+                    'net over ' + res.trades + (res.trades === 1 ? ' trade' : ' trades');
+            })();
 
             Plotly.react('chart-pnl', [
                 { x: series.dates, y: res.grossCurve, mode: 'lines', name: 'Pre-Cost Gross P&L', line: { color: '#00AEBB', width: 2.5, dash: 'dash' } },
