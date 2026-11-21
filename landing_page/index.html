@@ -5844,7 +5844,7 @@
             [/tender|delivery|physical|assign/, ansTender],
             [/audit|data quality|doctor|health|how many rows|sessions|dataset/, ansAudit],
             [/spec|purity|lot size|difference|vs|995|999|normali[sz]/, ansSpecs],
-            [/price|fair|value|quote|how much|cost of gold|rate/, ansPrice]
+            [/price|fair|value|quote|how much|cost of gold|rate|trading at|worth|quoted/, ansPrice]
         ];
 
         var busy = false;
@@ -5856,7 +5856,11 @@
                     catch (e) { return 'I could not read that figure from the page.'; }
                 }
             }
-            return 'I did not catch that one. I can cover price, alerts, carry, import parity, out-of-sample validation, attribution, liquidity, the tender window, data quality, contract specs and how the data was verified.<br><br>Type <b>help</b> for the full list.';
+            // No keyword matched, but a contract was named ("GOLDTEN", "tell me
+            // about guinea"). Naming a contract almost always means "what is it
+            // doing", so fall through to price rather than to the catch-all.
+            if (symbolIn(s)) return ansPrice(s);
+            return 'I did not catch that one. I can cover price, alerts, carry, import parity, out-of-sample validation, attribution, liquidity, the tender window, data quality, contract specs and how the data was verified.<br><br>Name any contract \u2014 GOLDM, GOLDTEN, GOLDGUINEA, GOLDPETAL \u2014 and I will show its prices. Type <b>help</b> for the full list.';
         }
 
         function respond(q) {
